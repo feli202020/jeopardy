@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeopardy – Gamemaster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e17;
+    --surface: #1a1828;
+    --surface2: #232134;
+    --border: #2e2b45;
+    --gold: #f5c842;
+    --gold-light: #fde68a;
+    --gold-glow: rgba(245,200,66,.15);
+    --green: #34d399;
+    --red: #f87171;
+    --text: #f0eeff;
+    --text-muted: #7c7a96;
+    --text-dim: #3a3858;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-logo { font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 700; color: var(--gold); letter-spacing: 2px; }
+  .topbar-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .topbar-badge span { color: var(--gold); font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 2px; }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; }
+
+  .btn {
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-size: .875rem;
+    font-weight: 700;
+    font-family: inherit;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary { background: var(--gold); color: #0f0e17; }
+  .btn-primary:hover { background: var(--gold-light); }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--border); }
+  .btn-danger { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+  .btn-danger:hover { background: rgba(248,113,113,.25); }
+  .btn-success { background: rgba(52,211,153,.15); color: var(--green); border: 1px solid rgba(52,211,153,.3); }
+  .btn-success:hover { background: rgba(52,211,153,.25); }
+  .btn-lg { padding: 12px 28px; font-size: 1rem; }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* ── PAGES ── */
+  .page { display: none; padding: 28px 24px; max-width: 1280px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* ── QUIZ LIST ── */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .page-title { font-size: 1.4rem; font-weight: 800; }
+  .quiz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .quiz-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    transition: border-color .2s, transform .15s;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .quiz-card:hover { border-color: rgba(245,200,66,.4); transform: translateY(-2px); }
+  .quiz-card-title { font-size: 1.1rem; font-weight: 800; color: var(--text); }
+  .quiz-card-meta { font-size: .8rem; color: var(--text-muted); }
+  .quiz-card-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .empty-quizzes { text-align: center; padding: 60px 0; color: var(--text-muted); }
+  .empty-quizzes .icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+  /* ── LOBBY PAGE ── */
+  .lobby-page { max-width: 680px; margin: 60px auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 28px; }
+  .lobby-code-box {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 48px;
+    box-shadow: 0 0 60px var(--gold-glow);
+  }
+  .lobby-code-label { font-size: .75rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 8px; }
+  .lobby-code-value {
+    font-family: 'Oswald', sans-serif;
+    font-size: 4rem;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 14px;
+  }
+  .lobby-code-hint { font-size: .85rem; color: var(--text-muted); margin-top: 6px; }
+  .lobby-players-section { width: 100%; }
+  .lobby-players-section h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px; }
+  .player-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .player-chip {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 99px;
+    padding: 7px 18px;
+    font-weight: 600;
+    font-size: .9rem;
+  }
+
+  /* ── GAME LAYOUT ── */
+  .game-grid { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .game-grid { grid-template-columns: 1fr; } }
+
+  /* ── BOARD ── */
+  .board-wrap { overflow-x: auto; }
+  .board { display: flex; gap: 4px; min-width: 500px; }
+  .board-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .board-hdr {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 8px;
+    text-align: center;
+    font-weight: 800;
+    color: var(--gold);
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    min-height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .board-cell {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 1.5rem;
+    color: var(--gold);
+    cursor: pointer;
+    transition: all .15s;
+    aspect-ratio: 1.6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .board-cell:hover:not(.answered):not(.disabled) {
+    border-color: var(--gold);
+    background: #1e1c30;
+    transform: scale(1.04);
+    box-shadow: 0 4px 20px var(--gold-glow);
+  }
+  .board-cell.answered { background: var(--surface2); color: var(--text-dim); border-color: var(--surface2); cursor: default; }
+  .board-cell.disabled { opacity: .4; cursor: not-allowed; }
+  .board-cell.dd-marker::after {
+    content: '★';
+    position: absolute;
+    top: 3px; right: 6px;
+    font-size: .65rem;
+    color: var(--gold);
+    opacity: .5;
+  }
+
+  /* ── QUESTION PANEL ── */
+  .q-panel {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-top: 16px;
+  }
+  .q-panel-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .q-value-pill {
+    background: rgba(245,200,66,.12);
+    border: 1.5px solid rgba(245,200,66,.3);
+    border-radius: 99px;
+    padding: 5px 16px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .dd-badge {
+    background: linear-gradient(135deg, #92400e, #b45309);
+    border: 1.5px solid var(--gold);
+    color: var(--gold);
+    border-radius: 99px;
+    padding: 5px 14px;
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .q-text { font-size: 1.4rem; font-weight: 700; line-height: 1.4; margin-bottom: 16px; }
+  .q-media { margin-bottom: 16px; }
+  .q-media img { max-width: 100%; max-height: 260px; border-radius: var(--radius-sm); }
+  .q-media video { max-width: 100%; border-radius: var(--radius-sm); }
+  .q-media audio { width: 100%; }
+  .answer-box {
+    background: rgba(52,211,153,.07);
+    border: 1.5px solid rgba(52,211,153,.25);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-size: 1rem;
+  }
+  .answer-label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--green); font-weight: 700; margin-bottom: 4px; }
+  .answer-text { font-weight: 700; color: var(--green); font-size: 1.1rem; }
+
+  /* ── BUZZER ── */
+  .buzzer-box {
+    background: rgba(245,200,66,.06);
+    border: 1.5px solid rgba(245,200,66,.2);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .buzzer-box-label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 700; margin-bottom: 8px; }
+  .buzzer-name { font-size: 1.6rem; font-weight: 900; color: var(--gold); }
+  .judge-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .wait-row { color: var(--text-muted); font-size: .9rem; display: flex; align-items: center; gap: 10px; }
+  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
+
+  /* ── SIDEBAR ── */
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .sidebar-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .sidebar-card-title { font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 700; margin-bottom: 14px; }
+  .score-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .score-row:last-child { border-bottom: none; }
+  .score-rank { width: 20px; font-size: .8rem; color: var(--text-muted); font-weight: 700; }
+  .score-name { flex: 1; font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .score-pts { font-family: 'Oswald', sans-serif; font-size: 1.2rem; font-weight: 600; color: var(--gold); }
+  .score-pts.neg { color: var(--red); }
+  .progress-bar-wrap { margin-top: 8px; }
+  .progress-label { font-size: .75rem; color: var(--text-muted); margin-bottom: 6px; }
+  .progress-bar-bg { height: 6px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--gold); border-radius: 99px; transition: width .4s; }
+
+  /* ── END ── */
+  .end-page { max-width: 600px; margin: 40px auto; text-align: center; }
+  .end-title { font-family: 'Oswald', sans-serif; font-size: 3.5rem; color: var(--gold); margin-bottom: 32px; }
+  .podium-wrap { display: flex; justify-content: center; align-items: flex-end; gap: 12px; margin-bottom: 28px; }
+  .podium-place {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 14px;
+    min-width: 130px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .podium-place.p1 { border-color: var(--gold); box-shadow: 0 0 40px var(--gold-glow); }
+  .podium-place.p2 { border-color: #9ca3af; }
+  .podium-place.p3 { border-color: #b45309; }
+  .podium-emoji { font-size: 2rem; }
+  .podium-name { font-weight: 800; font-size: 1rem; }
+  .podium-score { font-family: 'Oswald', sans-serif; font-size: 1.4rem; color: var(--gold); }
+  .final-list { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+  .final-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .final-rank { width: 30px; color: var(--text-muted); font-weight: 700; }
+  .final-name { flex: 1; font-weight: 700; }
+  .final-score { font-family: 'Oswald', sans-serif; font-size: 1.3rem; color: var(--gold); }
+  .final-score.neg { color: var(--red); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 18px;
+    font-size: .875rem;
+    opacity: 0;
+    transition: opacity .25s, transform .25s;
+    transform: translateY(8px);
+    pointer-events: none;
+    z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.ok { border-color: var(--green); }
+  #toast.err { border-color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">JEOPARDY</div>
+  <div class="topbar-badge" id="topbarBadge" style="display:none">Code: <span id="topbarCode">---</span></div>
+  <div class="topbar-right" id="topbarRight"></div>
+</div>
+
+<!-- QUIZ LIST -->
+<div id="pageList" class="page active">
+  <div class="page-header">
+    <div class="page-title">Deine Quizzes</div>
+    <button class="btn btn-primary" onclick="location.href='/editor.html'">+ Neues Quiz</button>
+  </div>
+  <div id="quizGrid" class="quiz-grid"></div>
+</div>
+
+<!-- LOBBY / WAITING ROOM -->
+<div id="pageLobby" class="page">
+  <div class="lobby-page">
+    <div class="lobby-code-box">
+      <div class="lobby-code-label">Spieler joinen unter der Adresse mit Code</div>
+      <div class="lobby-code-value" id="roomCodeDisplay">------</div>
+      <div class="lobby-code-hint">Freunde öffnen diese Seite und geben den Code ein</div>
+    </div>
+    <div class="lobby-players-section">
+      <h3 id="lobbyPlayerCount">Spieler (0)</h3>
+      <div class="player-chips" id="lobbyPlayerList"></div>
+    </div>
+    <button class="btn btn-primary btn-lg" id="btnStartGame" disabled onclick="startGame()">Spiel starten</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="pageGame" class="page">
+  <div class="game-grid">
+    <div>
+      <div class="board-wrap"><div class="board" id="gmBoard"></div></div>
+      <div id="questionPanel" style="display:none" class="q-panel">
+        <div class="q-panel-header">
+          <div class="q-value-pill" id="gmQValue"></div>
+          <div class="dd-badge" id="gmDdBadge" style="display:none">★ Daily Double</div>
+        </div>
+        <div class="q-text" id="gmQText"></div>
+        <div class="q-media" id="gmQMedia"></div>
+        <div class="answer-box">
+          <div class="answer-label">Antwort (nur du siehst das)</div>
+          <div class="answer-text" id="gmQAnswer"></div>
+        </div>
+        <div id="buzzerBox" class="buzzer-box" style="display:none">
+          <div class="buzzer-box-label">Erster Buzzer</div>
+          <div class="buzzer-name" id="gmBuzzerName"></div>
+        </div>
+        <div class="judge-row" id="judgeRow" style="display:none">
+          <button class="btn btn-success btn-lg" onclick="judge(true)">✓ Richtig</button>
+          <button class="btn btn-danger btn-lg" onclick="judge(false)">✗ Falsch</button>
+          <button class="btn btn-ghost" onclick="skipQuestion()">Überspringen</button>
+        </div>
+        <div class="wait-row" id="waitRow" style="display:none">
+          <div class="pulse-dot"></div>
+          <span>Warte auf Buzzer…</span>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="skipQuestion()">Frage überspringen</button>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar">
+      <div class="sidebar-card">
+        <div class="sidebar-card-title">Scoreboard</div>
+        <div id="gmScoreboard"></div>
+      </div>
+      <div class="sidebar-card">
+        <div class="sidebar-card-title">Fortschritt</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-label" id="gmProgress">0 / 0 Fragen gespielt</div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="gmProgressBar" style="width:0%"></div></div>
+        </div>
+        <button class="btn btn-danger" style="margin-top:16px; width:100%" onclick="endGame()">Spiel beenden</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- END -->
+<div id="pageEnd" class="page">
+  <div class="end-page">
+    <div class="end-title">🏆 Spielende!</div>
+    <div class="podium-wrap" id="endPodium"></div>
+    <div class="final-list" id="endScores"></div>
+    <button class="btn btn-primary btn-lg" onclick="location.reload()" style="margin-top:24px">Neues Spiel</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let state = null;
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function toast(msg, type = '', dur = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => t.className = '', dur);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── QUIZ LIST ────────────────────────────────────────────────────────────────
+async function loadQuizList() {
+  const res = await fetch('/api/quizzes');
+  const quizzes = await res.json();
+  const grid = document.getElementById('quizGrid');
+  if (quizzes.length === 0) {
+    grid.innerHTML = `<div class="empty-quizzes"><div class="icon">📋</div><p>Noch kein Quiz vorhanden.<br>Erstelle dein erstes Quiz!</p></div>`;
+    return;
+  }
+  grid.innerHTML = quizzes.map(q => `
+    <div class="quiz-card">
+      <div class="quiz-card-title">${esc(q.title)}</div>
+      <div class="quiz-card-meta">${q.categoryCount} Kategorien</div>
+      <div class="quiz-card-actions">
+        <button class="btn btn-primary" onclick="createRoom('${q.id}')">▶ Starten</button>
+        <button class="btn btn-ghost" onclick="location.href='/editor.html?id=${q.id}'">Bearbeiten</button>
+        <button class="btn btn-danger" onclick="deleteQuiz('${q.id}')">Löschen</button>
+      </div>
+    </div>`).join('');
+}
+
+async function deleteQuiz(id) {
+  if (!confirm('Quiz wirklich löschen?')) return;
+  await fetch(`/api/quizzes/${id}`, { method: 'DELETE' });
+  loadQuizList();
+}
+
+// ── ROOM ─────────────────────────────────────────────────────────────────────
+function createRoom(quizId) {
+  socket.emit('gm:create_room', { quizId }, (res) => {
+    if (res.error) return toast(res.error, 'err');
+    document.getElementById('roomCodeDisplay').textContent = res.code;
+    document.getElementById('topbarBadge').style.display = 'flex';
+    document.getElementById('topbarCode').textContent = res.code;
+    updateState(res.state);
+    showPage('pageLobby');
+  });
+}
+
+function startGame() {
+  socket.emit('gm:start_game', {}, (res) => {
+    if (res?.error) return toast(res.error, 'err');
+  });
+}
+
+function selectQuestion(ci, qi) {
+  socket.emit('gm:select_question', { categoryIdx: ci, questionIdx: qi });
+}
+
+function judge(correct) {
+  socket.emit('gm:judge', { correct });
+}
+
+function skipQuestion() {
+  socket.emit('gm:skip_question');
+}
+
+function endGame() {
+  if (!confirm('Spiel wirklich beenden?')) return;
+  socket.emit('gm:end_game');
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+socket.on('room:update', updateState);
+socket.on('game:closed', () => location.reload());
+
+function updateState(s) {
+  state = s;
+  const phase = s.phase;
+
+  if (phase === 'lobby') {
+    renderLobby(s);
+  } else if (phase === 'end') {
+    renderEnd(s);
+    showPage('pageEnd');
+  } else {
+    if (!document.getElementById('pageGame').classList.contains('active')) showPage('pageGame');
+    renderBoard(s);
+    renderScoreboard(s);
+    renderProgress(s);
+    renderQuestion(s);
+  }
+}
+
+function renderLobby(s) {
+  const players = s.players;
+  document.getElementById('lobbyPlayerCount').textContent = `Spieler (${players.length})`;
+  document.getElementById('lobbyPlayerList').innerHTML = players.map(p =>
+    `<div class="player-chip">${esc(p.name)}</div>`).join('');
+  document.getElementById('btnStartGame').disabled = players.length === 0;
+}
+
+function renderBoard(s) {
+  const board = document.getElementById('gmBoard');
+  board.innerHTML = '';
+  s.board.forEach((cat, ci) => {
+    const col = document.createElement('div');
+    col.className = 'board-col';
+    const hdr = document.createElement('div');
+    hdr.className = 'board-hdr';
+    hdr.textContent = cat.name;
+    col.appendChild(hdr);
+    cat.questions.forEach((q, qi) => {
+      const cell = document.createElement('div');
+      const canClick = !q.answered && s.phase === 'board';
+      cell.className = 'board-cell' + (q.answered ? ' answered' : '') + (q.isDailyDouble ? ' dd-marker' : '') + (canClick ? '' : ' disabled');
+      cell.textContent = q.answered ? '' : `$${q.value}`;
+      if (canClick) cell.onclick = () => selectQuestion(ci, qi);
+      col.appendChild(cell);
+    });
+    board.appendChild(col);
+  });
+}
+
+function renderScoreboard(s) {
+  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  document.getElementById('gmScoreboard').innerHTML = sorted.map((p, i) => `
+    <div class="score-row">
+      <span class="score-rank">${i+1}</span>
+      <span class="score-name">${esc(p.name)}</span>
+      <span class="score-pts ${p.score<0?'neg':''}">$${p.score}</span>
+    </div>`).join('');
+}
+
+function renderProgress(s) {
+  const all = s.board.flatMap(c => c.questions);
+  const done = all.filter(q => q.answered).length;
+  const pct = all.length ? Math.round(done / all.length * 100) : 0;
+  document.getElementById('gmProgress').textContent = `${done} / ${all.length} Fragen gespielt`;
+  document.getElementById('gmProgressBar').style.width = pct + '%';
+}
+
+function renderQuestion(s) {
+  const panel = document.getElementById('questionPanel');
+  if (!s.activeQuestion) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+
+  const q = s.activeQuestion;
+  document.getElementById('gmQValue').textContent = q.isDailyDouble ? `★ $${q.value} (×2)` : `$${q.value}`;
+  document.getElementById('gmDdBadge').style.display = q.isDailyDouble ? 'inline-flex' : 'none';
+  document.getElementById('gmQText').textContent = q.question || '';
+  document.getElementById('gmQAnswer').textContent = q.answer || '—';
+
+  const media = document.getElementById('gmQMedia');
+  media.innerHTML = '';
+  if (q.mediaUrl) {
+    if (q.mediaType?.startsWith('image')) media.innerHTML = `<img src="${esc(q.mediaUrl)}" alt="">`;
+    else if (q.mediaType?.startsWith('video')) media.innerHTML = `<video controls src="${esc(q.mediaUrl)}"></video>`;
+    else if (q.mediaType?.startsWith('audio')) media.innerHTML = `<audio controls src="${esc(q.mediaUrl)}"></audio>`;
+  }
+
+  const buzzerBox = document.getElementById('buzzerBox');
+  const judgeRow = document.getElementById('judgeRow');
+  const waitRow = document.getElementById('waitRow');
+
+  if (s.phase === 'buzzed' && s.buzzer) {
+    buzzerBox.style.display = 'block';
+    document.getElementById('gmBuzzerName').textContent = s.buzzer;
+    judgeRow.style.display = 'flex';
+    waitRow.style.display = 'none';
+  } else {
+    buzzerBox.style.display = 'none';
+    judgeRow.style.display = 'none';
+    waitRow.style.display = 'flex';
+  }
+}
+
+function renderEnd(s) {
+  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const medals = ['🥇','🥈','🥉'];
+  const cls = ['p1','p2','p3'];
+  document.getElementById('endPodium').innerHTML = sorted.slice(0,3).map((p,i) => `
+    <div class="podium-place ${cls[i]||''}">
+      <div class="podium-emoji">${medals[i]||'🎖️'}</div>
+      <div class="podium-name">${esc(p.name)}</div>
+      <div class="podium-score">$${p.score}</div>
+    </div>`).join('');
+  document.getElementById('endScores').innerHTML = sorted.map((p,i) => `
+    <div class="final-row">
+      <span class="final-rank">${medals[i]||i+1+'.'}</span>
+      <span class="final-name">${esc(p.name)}</span>
+      <span class="final-score ${p.score<0?'neg':''}">$${p.score}</span>
+    </div>`).join('');
+}
+
+loadQuizList();
+</script>
+</body>
+</html>

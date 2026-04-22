@@ -113,7 +113,7 @@ function createRoom(quizId, gamemasterSocketId) {
     quiz,
     board,
     gamemasterId: gamemasterSocketId,
-    players: {},       // { socketId: { name, score, socketId } }
+    players: {},       // { socketId: { name, score, socketId, online } }
     phase: 'lobby',    // lobby | board | question | buzzed | judging | end
     activeQuestion: null,  // { categoryIdx, questionIdx }
     buzzer: null,          // first buzzer socketId
@@ -141,7 +141,7 @@ function roomPublicState(room) {
         isDailyDouble: q.isDailyDouble
       }))
     })),
-    players: Object.values(room.players),
+    players: Object.values(room.players).map(p => ({ name: p.name, score: p.score, socketId: p.socketId, online: p.online })),
     activeQuestion: room.activeQuestion ? {
       categoryIdx: room.activeQuestion.categoryIdx,
       questionIdx: room.activeQuestion.questionIdx,
@@ -190,14 +190,39 @@ io.on('connection', (socket) => {
   socket.on('player:join', ({ code, name }, cb) => {
     const room = rooms[code?.toUpperCase()];
     if (!room) return cb({ error: 'Raum nicht gefunden' });
-    if (room.phase !== 'lobby') return cb({ error: 'Spiel bereits gestartet' });
     if (!name?.trim()) return cb({ error: 'Bitte Namen eingeben' });
 
     const playerName = name.trim().substring(0, 20);
-    const exists = Object.values(room.players).find(p => p.name.toLowerCase() === playerName.toLowerCase());
-    if (exists) return cb({ error: 'Name bereits vergeben' });
 
-    room.players[socket.id] = { name: playerName, score: 0, socketId: socket.id };
+    // Check for offline player with same name → rejoin
+    const existing = Object.values(room.players).find(
+      p => p.name.toLowerCase() === playerName.toLowerCase() && !p.online
+    );
+
+    if (existing) {
+      // Reassign to new socket, keep score
+      delete room.players[existing.socketId];
+      existing.socketId = socket.id;
+      existing.online = true;
+      room.players[socket.id] = existing;
+      // Restore buzzer reference if this player had it
+      if (room.buzzer === existing.socketId) room.buzzer = socket.id;
+      room.lockedOut.delete(existing.socketId);
+      socket.join(room.code);
+      io.to(room.code).emit('room:update', roomPublicState(room));
+      io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+      return cb({ ok: true, state: roomPublicState(room), playerId: socket.id, rejoined: true });
+    }
+
+    // New join — only allowed in lobby or if game hasn't started
+    if (room.phase !== 'lobby') return cb({ error: 'Spiel bereits gestartet' });
+
+    const nameTaken = Object.values(room.players).find(
+      p => p.name.toLowerCase() === playerName.toLowerCase()
+    );
+    if (nameTaken) return cb({ error: 'Name bereits vergeben' });
+
+    room.players[socket.id] = { name: playerName, score: 0, socketId: socket.id, online: true };
     socket.join(room.code);
 
     io.to(room.code).emit('room:update', roomPublicState(room));
@@ -328,6 +353,15 @@ io.on('connection', (socket) => {
     cb?.({ ok: true });
   });
 
+  // ── OBSERVER: display / answers tab joins silently ──
+  socket.on('observer:join', ({ code, type }, cb) => {
+    const room = rooms[code?.toUpperCase()];
+    if (!room) return cb?.({ error: 'Raum nicht gefunden' });
+    socket.join(room.code);
+    const state = type === 'answers' ? gamemasterState(room) : roomPublicState(room);
+    cb?.({ ok: true, state });
+  });
+
   // ── DISCONNECT ──
   socket.on('disconnect', () => {
     const room = getRoomBySocket(socket.id);
@@ -340,10 +374,18 @@ io.on('connection', (socket) => {
     }
 
     if (room.players[socket.id]) {
-      delete room.players[socket.id];
+      room.players[socket.id].online = false;
+      // If this player held the buzzer, release it so game can continue
       if (room.buzzer === socket.id) {
         room.buzzer = null;
-        room.phase = room.activeQuestion ? 'question' : 'board';
+        room.lockedOut.add(socket.id);
+        const activePlayers = Object.keys(room.players).filter(id => room.players[id].online && !room.lockedOut.has(id));
+        room.phase = activePlayers.length > 0 ? 'question' : 'board';
+        if (room.phase === 'board') {
+          room.activeQuestion = null;
+          room.buzzOrder = [];
+          room.lockedOut = new Set();
+        }
       }
       io.to(room.code).emit('room:update', roomPublicState(room));
       io.to(room.gamemasterId).emit('room:update', gamemasterState(room));

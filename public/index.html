@@ -210,17 +210,18 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 10px 6px;
+    padding: 4px 4px;
     text-align: center;
     font-weight: 700;
     color: var(--gold);
-    font-size: .72rem;
+    font-size: .65rem;
     text-transform: uppercase;
     letter-spacing: .5px;
-    min-height: 52px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
   }
   .board-cell {
     background: var(--surface);
@@ -229,15 +230,16 @@
     text-align: center;
     font-family: 'Oswald', sans-serif;
     font-weight: 600;
-    font-size: 1.25rem;
+    font-size: .85rem;
     color: var(--gold);
-    aspect-ratio: 1.5;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all .15s;
   }
   .board-cell.answered { background: var(--surface2); color: var(--text-dim); border-color: var(--surface2); }
+  .board-cell.buzzed-here { border-color: var(--green); box-shadow: 0 0 8px rgba(52,211,153,.35); color: var(--green); }
 
   /* ── QUESTION PAGE ── */
   .question-page { flex: 1; display: flex; flex-direction: column; gap: 20px; align-items: center; justify-content: space-between; padding: 8px 0; }
@@ -486,6 +488,8 @@ const socket = io();
 let myId = null;
 let myName = '';
 let roomCode = '';
+let myBuzzedCell = null; // { categoryIdx, questionIdx }
+
 
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -524,6 +528,7 @@ function joinGame() {
     myId = res.playerId;
     myName = name;
     roomCode = code;
+    if (res.rejoined) toast('Willkommen zurück! Deine Punkte wurden wiederhergestellt.');
     updateState(res.state);
   });
 }
@@ -567,16 +572,17 @@ function renderLobbyPlayers(s) {
 function renderBoard(s) {
   const board = document.getElementById('playerBoard');
   board.innerHTML = '';
-  s.board.forEach(cat => {
+  s.board.forEach((cat, ci) => {
     const col = document.createElement('div');
     col.className = 'board-col';
     const hdr = document.createElement('div');
     hdr.className = 'board-hdr';
     hdr.textContent = cat.name;
     col.appendChild(hdr);
-    cat.questions.forEach(q => {
+    cat.questions.forEach((q, qi) => {
       const cell = document.createElement('div');
-      cell.className = 'board-cell' + (q.answered ? ' answered' : '');
+      const isBuzzed = myBuzzedCell && myBuzzedCell.categoryIdx === ci && myBuzzedCell.questionIdx === qi;
+      cell.className = 'board-cell' + (q.answered ? ' answered' : '') + (isBuzzed && !q.answered ? ' buzzed-here' : '');
       cell.textContent = q.answered ? '' : `$${q.value}`;
       col.appendChild(cell);
     });
@@ -625,9 +631,16 @@ function renderQuestion(s) {
     announce.textContent = '';
     announce.className = 'buzzed-announce';
   } else if (s.phase === 'buzzed') {
+    const wasAlreadyBuzzed = btn.disabled;
     btn.disabled = true;
     const isMe = s.buzzer === myName;
     btn.className = 'buzzer-btn' + (isMe ? ' buzzed-me' : '');
+    if (!wasAlreadyBuzzed) {
+      // no sound
+      if (isMe && s.activeQuestion) {
+        myBuzzedCell = { categoryIdx: s.activeQuestion.categoryIdx, questionIdx: s.activeQuestion.questionIdx };
+      }
+    }
     if (isMe) {
       status.textContent = 'Du hast gebuzzert — antworte laut!';
       announce.textContent = '🎯 Du bist dran!';

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeopardy – Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e17;
+    --surface: #1a1828;
+    --surface2: #232134;
+    --border: #2e2b45;
+    --gold: #f5c842;
+    --gold-light: #fde68a;
+    --gold-glow: rgba(245,200,66,.18);
+    --green: #34d399;
+    --red: #f87171;
+    --text: #f0eeff;
+    --text-muted: #7c7a96;
+    --text-dim: #3a3858;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+
+  /* ── WAITING ── */
+  #waiting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 20px;
+    color: var(--text-muted);
+  }
+  #waiting .logo { font-family: 'Oswald', sans-serif; font-size: 4rem; color: var(--gold); letter-spacing: 6px; }
+  #waiting .hint { font-size: 1rem; }
+
+  /* ── MAIN LAYOUT ── */
+  #main { display: none; height: 100vh; flex-direction: column; }
+  #main.active { display: flex; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 28px;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+  .topbar-logo { font-family: 'Oswald', sans-serif; font-size: 1.4rem; color: var(--gold); letter-spacing: 3px; }
+  .topbar-spacer { flex: 1; }
+  .score-pills { display: flex; gap: 10px; }
+  .score-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 5px 16px;
+    font-size: .85rem;
+    font-weight: 700;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .score-pill .pname { color: var(--text-muted); }
+  .score-pill .pscore { font-family: 'Oswald', sans-serif; font-size: 1rem; color: var(--gold); }
+  .score-pill .pscore.neg { color: var(--red); }
+
+  /* ── BOARD ── */
+  #boardView { flex: 1; padding: 16px 20px; display: none; overflow: hidden; }
+  #boardView.active { display: flex; flex-direction: column; }
+  .board { display: flex; gap: 6px; flex: 1; }
+  .board-col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .board-hdr {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 6px;
+    text-align: center;
+    font-weight: 800;
+    color: var(--gold);
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .board-cell {
+    flex: 1;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.2rem, 2.5vw, 2rem);
+    color: var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background .2s;
+  }
+  .board-cell.answered { background: var(--surface2); color: var(--text-dim); border-color: var(--surface2); }
+  .board-cell.dd-marker::after {
+    content: '★';
+    position: absolute;
+    top: 5px; right: 8px;
+    font-size: .7rem;
+    color: var(--gold);
+    opacity: .4;
+  }
+
+  /* ── QUESTION VIEW ── */
+  #questionView {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 48px;
+    gap: 24px;
+    text-align: center;
+  }
+  #questionView.active { display: flex; }
+  .q-value-pill {
+    background: rgba(245,200,66,.12);
+    border: 2px solid rgba(245,200,66,.35);
+    border-radius: 99px;
+    padding: 8px 28px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.4rem;
+    color: var(--gold);
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .dd-badge {
+    background: linear-gradient(135deg, #92400e, #b45309);
+    border: 2px solid var(--gold);
+    color: var(--gold);
+    border-radius: 99px;
+    padding: 6px 18px;
+    font-size: .95rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .q-text {
+    font-size: clamp(1.4rem, 3.5vw, 2.6rem);
+    font-weight: 800;
+    line-height: 1.3;
+    max-width: 900px;
+  }
+  .q-media img { max-width: 100%; max-height: 260px; border-radius: var(--radius); }
+  .q-media video { max-width: 80%; max-height: 260px; border-radius: var(--radius); }
+  .q-media audio { width: 360px; }
+
+  /* ── BUZZER BANNER ── */
+  #buzzerBanner {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(135deg, #1a1400, #2a2000);
+    border-top: 3px solid var(--gold);
+    padding: 20px 40px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    box-shadow: 0 -8px 40px var(--gold-glow);
+    animation: slideUp .25s ease;
+    z-index: 50;
+  }
+  #buzzerBanner.active { display: flex; }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .buzzer-label { font-size: .85rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); font-weight: 700; }
+  .buzzer-name { font-family: 'Oswald', sans-serif; font-size: clamp(2rem, 5vw, 3.5rem); color: var(--gold); font-weight: 700; }
+  .buzzer-flash {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 16px var(--gold);
+    animation: blink .6s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+  /* ── END ── */
+  #endView {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 32px;
+  }
+  #endView.active { display: flex; }
+  .end-title { font-family: 'Oswald', sans-serif; font-size: 4rem; color: var(--gold); letter-spacing: 4px; }
+  .podium-wrap { display: flex; justify-content: center; align-items: flex-end; gap: 16px; }
+  .podium-place {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    min-width: 160px;
+    text-align: center;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .podium-place.p1 { border-color: var(--gold); box-shadow: 0 0 50px var(--gold-glow); padding: 32px 24px; }
+  .podium-place.p2 { border-color: #9ca3af; }
+  .podium-place.p3 { border-color: #b45309; }
+  .podium-emoji { font-size: 2.5rem; }
+  .podium-name { font-weight: 800; font-size: 1.2rem; }
+  .podium-score { font-family: 'Oswald', sans-serif; font-size: 1.8rem; color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div id="waiting">
+  <div class="logo">JEOPARDY</div>
+  <div class="hint">Warte auf Spielstart…</div>
+</div>
+
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-logo">JEOPARDY</div>
+    <div class="topbar-spacer"></div>
+    <div class="score-pills" id="scorePills"></div>
+  </div>
+
+  <div id="boardView">
+    <div class="board" id="dispBoard"></div>
+  </div>
+
+  <div id="questionView">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center">
+      <div class="q-value-pill" id="dispQValue"></div>
+      <div class="dd-badge" id="dispDdBadge" style="display:none">★ Daily Double</div>
+    </div>
+    <div class="q-text" id="dispQText"></div>
+    <div class="q-media" id="dispQMedia"></div>
+  </div>
+
+  <div id="endView">
+    <div class="end-title">🏆 SPIELENDE!</div>
+    <div class="podium-wrap" id="dispPodium"></div>
+  </div>
+</div>
+
+<div id="buzzerBanner">
+  <div class="buzzer-flash"></div>
+  <div>
+    <div class="buzzer-label">Buzzer</div>
+    <div class="buzzer-name" id="dispBuzzerName"></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const code = new URLSearchParams(location.search).get('code');
+
+socket.on('connect', () => {
+  if (code) socket.emit('observer:join', { code, type: 'display' }, (res) => {
+    if (res?.state) render(res.state);
+  });
+});
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function show(viewId) {
+  ['boardView','questionView','endView'].forEach(id => {
+    document.getElementById(id).classList.toggle('active', id === viewId);
+  });
+}
+
+socket.on('room:update', render);
+
+function render(s) {
+  document.getElementById('waiting').style.display = 'none';
+  document.getElementById('main').classList.add('active');
+
+  renderScores(s);
+
+  if (s.phase === 'end') {
+    show('endView');
+    renderEnd(s);
+    document.getElementById('buzzerBanner').classList.remove('active');
+    return;
+  }
+
+  if (s.activeQuestion) {
+    show('questionView');
+    renderQuestion(s);
+  } else {
+    show('boardView');
+    renderBoard(s);
+  }
+
+  const banner = document.getElementById('buzzerBanner');
+  if (s.phase === 'buzzed' && s.buzzer) {
+    document.getElementById('dispBuzzerName').textContent = s.buzzer;
+    banner.classList.add('active');
+  } else {
+    banner.classList.remove('active');
+  }
+}
+
+function renderScores(s) {
+  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  document.getElementById('scorePills').innerHTML = sorted.map(p => `
+    <div class="score-pill">
+      <span class="pname">${esc(p.name)}</span>
+      <span class="pscore ${p.score < 0 ? 'neg' : ''}">$${p.score}</span>
+    </div>`).join('');
+}
+
+function renderBoard(s) {
+  const board = document.getElementById('dispBoard');
+  board.innerHTML = '';
+  s.board.forEach(cat => {
+    const col = document.createElement('div');
+    col.className = 'board-col';
+    const hdr = document.createElement('div');
+    hdr.className = 'board-hdr';
+    hdr.textContent = cat.name;
+    col.appendChild(hdr);
+    cat.questions.forEach(q => {
+      const cell = document.createElement('div');
+      cell.className = 'board-cell' + (q.answered ? ' answered' : '') + (q.isDailyDouble ? ' dd-marker' : '');
+      cell.textContent = q.answered ? '' : `$${q.value}`;
+      col.appendChild(cell);
+    });
+    board.appendChild(col);
+  });
+}
+
+function renderQuestion(s) {
+  const q = s.activeQuestion;
+  document.getElementById('dispQValue').textContent = q.isDailyDouble ? `★ $${q.value} (×2)` : `$${q.value}`;
+  document.getElementById('dispDdBadge').style.display = q.isDailyDouble ? 'inline-flex' : 'none';
+  document.getElementById('dispQText').textContent = q.question || '';
+
+  const media = document.getElementById('dispQMedia');
+  media.innerHTML = '';
+  if (q.mediaUrl) {
+    if (q.mediaType?.startsWith('image')) media.innerHTML = `<img src="${esc(q.mediaUrl)}" alt="">`;
+    else if (q.mediaType?.startsWith('video')) media.innerHTML = `<video controls src="${esc(q.mediaUrl)}"></video>`;
+    else if (q.mediaType?.startsWith('audio')) media.innerHTML = `<audio controls src="${esc(q.mediaUrl)}"></audio>`;
+  }
+}
+
+function renderEnd(s) {
+  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const medals = ['🥇','🥈','🥉'];
+  const cls = ['p1','p2','p3'];
+  document.getElementById('dispPodium').innerHTML = sorted.slice(0,3).map((p,i) => `
+    <div class="podium-place ${cls[i]||''}">
+      <div class="podium-emoji">${medals[i]||'🎖️'}</div>
+      <div class="podium-name">${esc(p.name)}</div>
+      <div class="podium-score">$${p.score}</div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>

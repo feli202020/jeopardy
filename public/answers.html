@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeopardy – Antworten</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e17;
+    --surface: #1a1828;
+    --surface2: #232134;
+    --border: #2e2b45;
+    --gold: #f5c842;
+    --gold-light: #fde68a;
+    --gold-glow: rgba(245,200,66,.15);
+    --green: #34d399;
+    --red: #f87171;
+    --text: #f0eeff;
+    --text-muted: #7c7a96;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+
+  .topbar {
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 14px;
+  }
+  .topbar-logo { font-family: 'Oswald', sans-serif; font-size: 1.2rem; color: var(--gold); letter-spacing: 2px; }
+  .topbar-label {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--green);
+    font-weight: 700;
+    background: rgba(52,211,153,.08);
+    border: 1px solid rgba(52,211,153,.25);
+    border-radius: 6px;
+    padding: 3px 10px;
+  }
+
+  .content {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ── WAITING STATE ── */
+  #waiting {
+    text-align: center;
+    padding: 80px 0;
+    color: var(--text-muted);
+  }
+  #waiting .icon { font-size: 2.5rem; margin-bottom: 16px; }
+  #waiting p { font-size: 1rem; }
+
+  /* ── QUESTION CARD ── */
+  .q-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .q-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .q-value-pill {
+    background: rgba(245,200,66,.12);
+    border: 1.5px solid rgba(245,200,66,.3);
+    border-radius: 99px;
+    padding: 5px 18px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    color: var(--gold);
+    font-weight: 700;
+  }
+  .dd-badge {
+    background: linear-gradient(135deg, #92400e, #b45309);
+    border: 1.5px solid var(--gold);
+    color: var(--gold);
+    border-radius: 99px;
+    padding: 4px 14px;
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .q-text { font-size: 1.1rem; font-weight: 700; line-height: 1.45; color: var(--text); }
+
+  /* ── ANSWER ── */
+  .answer-box {
+    background: rgba(52,211,153,.07);
+    border: 1.5px solid rgba(52,211,153,.3);
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+  }
+  .answer-label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--green); font-weight: 700; margin-bottom: 6px; }
+  .answer-text { font-size: 1.4rem; font-weight: 800; color: var(--green); }
+
+  /* ── BUZZER BOX ── */
+  .buzzer-box {
+    background: rgba(245,200,66,.06);
+    border: 2px solid rgba(245,200,66,.3);
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .buzzer-flash {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 12px var(--gold);
+    flex-shrink: 0;
+    animation: blink .6s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+  .buzzer-info .buzzer-label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 700; margin-bottom: 2px; }
+  .buzzer-name { font-size: 1.6rem; font-weight: 900; color: var(--gold); }
+
+  /* ── JUDGE ── */
+  .judge-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    padding: 12px 28px;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: inherit;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    justify-content: center;
+  }
+  .btn-success { background: rgba(52,211,153,.15); color: var(--green); border: 1.5px solid rgba(52,211,153,.35); }
+  .btn-success:hover { background: rgba(52,211,153,.25); }
+  .btn-danger { background: rgba(248,113,113,.15); color: var(--red); border: 1.5px solid rgba(248,113,113,.35); }
+  .btn-danger:hover { background: rgba(248,113,113,.25); }
+  .btn-ghost { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); flex: none; padding: 12px 20px; }
+  .btn-ghost:hover { background: var(--border); color: var(--text); }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* ── WAITING FOR BUZZER ── */
+  .wait-row { color: var(--text-muted); font-size: .95rem; display: flex; align-items: center; gap: 10px; }
+  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
+
+  /* ── SCOREBOARD ── */
+  .score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .score-card-title { font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 700; margin-bottom: 14px; }
+  .score-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .score-row:last-child { border-bottom: none; }
+  .score-rank { width: 22px; font-size: .8rem; color: var(--text-muted); font-weight: 700; }
+  .score-name { flex: 1; font-weight: 600; }
+  .score-pts { font-family: 'Oswald', sans-serif; font-size: 1.2rem; color: var(--gold); }
+  .score-pts.neg { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">JEOPARDY</div>
+  <div class="topbar-label">🔑 Nur für dich</div>
+</div>
+
+<div class="content">
+  <div id="waiting">
+    <div class="icon">⏳</div>
+    <p>Warte auf Spielstart…</p>
+  </div>
+
+  <div id="qCard" class="q-card" style="display:none">
+    <div class="q-meta">
+      <div class="q-value-pill" id="ansQValue"></div>
+      <div class="dd-badge" id="ansDdBadge" style="display:none">★ Daily Double</div>
+    </div>
+    <div class="q-text" id="ansQText"></div>
+    <div class="answer-box">
+      <div class="answer-label">Antwort</div>
+      <div class="answer-text" id="ansQAnswer"></div>
+    </div>
+    <div id="ansBuzzerBox" class="buzzer-box" style="display:none">
+      <div class="buzzer-flash"></div>
+      <div class="buzzer-info">
+        <div class="buzzer-label">Erster Buzzer</div>
+        <div class="buzzer-name" id="ansBuzzerName"></div>
+      </div>
+    </div>
+    <div class="judge-row" id="ansJudgeRow" style="display:none">
+      <button class="btn btn-success" onclick="judge(true)">✓ Richtig</button>
+      <button class="btn btn-danger" onclick="judge(false)">✗ Falsch</button>
+      <button class="btn btn-ghost" onclick="skip()">Überspringen</button>
+    </div>
+    <div class="wait-row" id="ansWaitRow" style="display:none">
+      <div class="pulse-dot"></div>
+      <span>Warte auf Buzzer…</span>
+      <button class="btn btn-ghost" style="margin-left:auto;flex:none" onclick="skip()">Frage überspringen</button>
+    </div>
+  </div>
+
+  <div id="scoreCard" class="score-card" style="display:none">
+    <div class="score-card-title">Scoreboard</div>
+    <div id="ansScoreboard"></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const code = new URLSearchParams(location.search).get('code');
+
+socket.on('connect', () => {
+  if (code) socket.emit('observer:join', { code, type: 'answers' }, (res) => {
+    if (res?.state) render(res.state);
+  });
+});
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function judge(correct) { socket.emit('gm:judge', { correct }); }
+function skip() { socket.emit('gm:skip_question'); }
+
+socket.on('room:update', render);
+
+function render(s) {
+  document.getElementById('waiting').style.display = 'none';
+
+  const qCard = document.getElementById('qCard');
+  const scoreCard = document.getElementById('scoreCard');
+
+  if (s.phase === 'end' || !s.activeQuestion) {
+    qCard.style.display = 'none';
+  } else {
+    qCard.style.display = 'flex';
+    renderQuestion(s);
+  }
+
+  scoreCard.style.display = 'block';
+  renderScores(s);
+}
+
+function renderQuestion(s) {
+  const q = s.activeQuestion;
+  document.getElementById('ansQValue').textContent = q.isDailyDouble ? `★ $${q.value} (×2)` : `$${q.value}`;
+  document.getElementById('ansDdBadge').style.display = q.isDailyDouble ? 'inline-flex' : 'none';
+  document.getElementById('ansQText').textContent = q.question || '';
+  document.getElementById('ansQAnswer').textContent = q.answer || '—';
+
+  const buzzerBox = document.getElementById('ansBuzzerBox');
+  const judgeRow = document.getElementById('ansJudgeRow');
+  const waitRow = document.getElementById('ansWaitRow');
+
+  if (s.phase === 'buzzed' && s.buzzer) {
+    document.getElementById('ansBuzzerName').textContent = s.buzzer;
+    buzzerBox.style.display = 'flex';
+    judgeRow.style.display = 'flex';
+    waitRow.style.display = 'none';
+  } else {
+    buzzerBox.style.display = 'none';
+    judgeRow.style.display = 'none';
+    waitRow.style.display = 'flex';
+  }
+}
+
+function renderScores(s) {
+  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  document.getElementById('ansScoreboard').innerHTML = sorted.map((p, i) => `
+    <div class="score-row">
+      <span class="score-rank">${i+1}</span>
+      <span class="score-name" style="${p.online===false?'opacity:.45':''}">
+        ${esc(p.name)}${p.online===false?' 📴':''}
+      </span>
+      <span class="score-pts ${p.score<0?'neg':''}">$${p.score}</span>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>

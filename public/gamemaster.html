@@ -24,7 +24,8 @@
     --radius-sm: 8px;
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased; }
 
   /* ── TOPBAR ── */
   .topbar {
@@ -45,12 +46,35 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 4px 12px;
-    font-size: .8rem;
+    font-size: .75rem;
     font-weight: 600;
     color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
   }
-  .topbar-badge span { color: var(--gold); font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 2px; }
-  .topbar-right { margin-left: auto; display: flex; gap: 10px; }
+  .topbar-badge span { color: var(--gold); font-family: 'Oswald', sans-serif; font-size: .95rem; letter-spacing: 2px; line-height: 1; }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+  .topbar-link {
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-size: .8rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all .15s;
+  }
+  .topbar-link:hover { border-color: var(--gold); color: var(--gold); }
+  .topbar-link.display { border-color: rgba(99,102,241,.4); color: #a5b4fc; }
+  .topbar-link.display:hover { border-color: #a5b4fc; background: rgba(99,102,241,.1); }
+  .topbar-link.answers { border-color: rgba(52,211,153,.3); color: var(--green); }
+  .topbar-link.answers:hover { border-color: var(--green); background: rgba(52,211,153,.08); }
 
   .btn {
     padding: 8px 18px;
@@ -77,7 +101,7 @@
   .btn:disabled { opacity: .35; cursor: not-allowed; }
 
   /* ── PAGES ── */
-  .page { display: none; padding: 28px 24px; max-width: 1280px; margin: 0 auto; }
+  .page { display: none; padding: 16px 24px; max-width: 1280px; margin: 0 auto; height: calc(100vh - 56px); overflow-y: auto; }
   .page.active { display: block; }
 
   /* ── QUIZ LIST ── */
@@ -97,7 +121,8 @@
   .quiz-card:hover { border-color: rgba(245,200,66,.4); transform: translateY(-2px); }
   .quiz-card-title { font-size: 1.1rem; font-weight: 800; color: var(--text); }
   .quiz-card-meta { font-size: .8rem; color: var(--text-muted); }
-  .quiz-card-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .quiz-card-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .quiz-card-actions .btn { flex: 1; justify-content: center; font-size: .8rem; padding: 7px 10px; }
   .empty-quizzes { text-align: center; padding: 60px 0; color: var(--text-muted); }
   .empty-quizzes .icon { font-size: 2.5rem; margin-bottom: 12px; }
 
@@ -132,28 +157,31 @@
   }
 
   /* ── GAME LAYOUT ── */
-  .game-grid { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start; }
+  #pageGame { overflow: hidden; display: none; }
+  #pageGame.active { display: flex; flex-direction: column; }
+  .game-grid { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; flex: 1; min-height: 0; }
   @media (max-width: 900px) { .game-grid { grid-template-columns: 1fr; } }
 
   /* ── BOARD ── */
   .board-wrap { overflow-x: auto; }
-  .board { display: flex; gap: 4px; min-width: 500px; }
+  .board { display: flex; gap: 4px; min-width: 400px; }
   .board-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
   .board-hdr {
     background: var(--surface);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 12px 8px;
+    padding: 6px 4px;
     text-align: center;
     font-weight: 800;
     color: var(--gold);
-    font-size: .8rem;
+    font-size: .7rem;
     text-transform: uppercase;
     letter-spacing: .5px;
-    min-height: 62px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
   }
   .board-cell {
     background: var(--surface);
@@ -162,11 +190,11 @@
     text-align: center;
     font-family: 'Oswald', sans-serif;
     font-weight: 600;
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     color: var(--gold);
     cursor: pointer;
     transition: all .15s;
-    aspect-ratio: 1.6;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -194,10 +222,10 @@
     background: var(--surface);
     border: 1.5px solid var(--border);
     border-radius: var(--radius);
-    padding: 24px;
-    margin-top: 16px;
+    padding: 14px 18px;
+    margin-top: 10px;
   }
-  .q-panel-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .q-panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
   .q-value-pill {
     background: rgba(245,200,66,.12);
     border: 1.5px solid rgba(245,200,66,.3);
@@ -218,9 +246,9 @@
     font-weight: 800;
     letter-spacing: 1px;
   }
-  .q-text { font-size: 1.4rem; font-weight: 700; line-height: 1.4; margin-bottom: 16px; }
-  .q-media { margin-bottom: 16px; }
-  .q-media img { max-width: 100%; max-height: 260px; border-radius: var(--radius-sm); }
+  .q-text { font-size: 1.1rem; font-weight: 700; line-height: 1.4; margin-bottom: 10px; }
+  .q-media { margin-bottom: 10px; }
+  .q-media img { max-width: 100%; max-height: 160px; border-radius: var(--radius-sm); }
   .q-media video { max-width: 100%; border-radius: var(--radius-sm); }
   .q-media audio { width: 100%; }
   .answer-box {
@@ -250,7 +278,7 @@
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
 
   /* ── SIDEBAR ── */
-  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .sidebar { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: calc(100vh - 90px); }
   .sidebar-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -330,7 +358,10 @@
 <div class="topbar">
   <div class="topbar-logo">JEOPARDY</div>
   <div class="topbar-badge" id="topbarBadge" style="display:none">Code: <span id="topbarCode">---</span></div>
-  <div class="topbar-right" id="topbarRight"></div>
+  <div class="topbar-right" id="topbarRight">
+    <a id="linkDisplay" href="/display.html" target="_blank" class="topbar-link display">⬛ Display</a>
+    <a id="linkAnswers" href="/answers.html" target="_blank" class="topbar-link answers">🔑 Antworten</a>
+  </div>
 </div>
 
 <!-- QUIZ LIST -->
@@ -361,7 +392,7 @@
 <!-- GAME -->
 <div id="pageGame" class="page">
   <div class="game-grid">
-    <div>
+    <div style="overflow-y:auto; max-height:calc(100vh - 90px);">
       <div class="board-wrap"><div class="board" id="gmBoard"></div></div>
       <div id="questionPanel" style="display:none" class="q-panel">
         <div class="q-panel-header">
@@ -370,11 +401,7 @@
         </div>
         <div class="q-text" id="gmQText"></div>
         <div class="q-media" id="gmQMedia"></div>
-        <div class="answer-box">
-          <div class="answer-label">Antwort (nur du siehst das)</div>
-          <div class="answer-text" id="gmQAnswer"></div>
-        </div>
-        <div id="buzzerBox" class="buzzer-box" style="display:none">
+<div id="buzzerBox" class="buzzer-box" style="display:none">
           <div class="buzzer-box-label">Erster Buzzer</div>
           <div class="buzzer-name" id="gmBuzzerName"></div>
         </div>
@@ -422,6 +449,7 @@
 <script>
 const socket = io();
 let state = null;
+
 
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -473,6 +501,8 @@ function createRoom(quizId) {
     document.getElementById('roomCodeDisplay').textContent = res.code;
     document.getElementById('topbarBadge').style.display = 'flex';
     document.getElementById('topbarCode').textContent = res.code;
+    document.getElementById('linkDisplay').href = `/display.html?code=${res.code}`;
+    document.getElementById('linkAnswers').href = `/answers.html?code=${res.code}`;
     updateState(res.state);
     showPage('pageLobby');
   });
@@ -558,7 +588,9 @@ function renderScoreboard(s) {
   document.getElementById('gmScoreboard').innerHTML = sorted.map((p, i) => `
     <div class="score-row">
       <span class="score-rank">${i+1}</span>
-      <span class="score-name">${esc(p.name)}</span>
+      <span class="score-name" style="${p.online===false?'opacity:.45;text-decoration:line-through':''}">
+        ${esc(p.name)}${p.online===false?' 📴':''}
+      </span>
       <span class="score-pts ${p.score<0?'neg':''}">$${p.score}</span>
     </div>`).join('');
 }
@@ -580,8 +612,6 @@ function renderQuestion(s) {
   document.getElementById('gmQValue').textContent = q.isDailyDouble ? `★ $${q.value} (×2)` : `$${q.value}`;
   document.getElementById('gmDdBadge').style.display = q.isDailyDouble ? 'inline-flex' : 'none';
   document.getElementById('gmQText').textContent = q.question || '';
-  document.getElementById('gmQAnswer').textContent = q.answer || '—';
-
   const media = document.getElementById('gmQMedia');
   media.innerHTML = '';
   if (q.mediaUrl) {
@@ -595,6 +625,7 @@ function renderQuestion(s) {
   const waitRow = document.getElementById('waitRow');
 
   if (s.phase === 'buzzed' && s.buzzer) {
+    const alreadyShown = buzzerBox.style.display === 'block' && document.getElementById('gmBuzzerName').textContent === s.buzzer;
     buzzerBox.style.display = 'block';
     document.getElementById('gmBuzzerName').textContent = s.buzzer;
     judgeRow.style.display = 'flex';

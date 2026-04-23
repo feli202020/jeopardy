@@ -395,6 +395,14 @@ io.on('connection', (socket) => {
     cb?.({ ok: true });
   });
 
+  // Gamemaster steuert Media-Playback für alle
+  socket.on('gm:media', ({ action, time }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    io.to(room.code).emit('media:sync', { action, time });
+    cb?.({ ok: true });
+  });
+
   socket.on('gm:end_game', (_, cb) => {
     const room = getRoomBySocket(socket.id);
     if (!room || room.gamemasterId !== socket.id) return;

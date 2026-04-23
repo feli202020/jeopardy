@@ -250,7 +250,64 @@
   .q-media { margin-bottom: 10px; }
   .q-media img { max-width: 100%; max-height: 160px; border-radius: var(--radius-sm); }
   .q-media video { max-width: 100%; border-radius: var(--radius-sm); }
-  .q-media audio { width: 100%; }
+
+  /* ── MEDIA CONTROLS ── */
+  .media-ctrl {
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .media-ctrl-row { display: flex; align-items: center; gap: 10px; }
+  .mc-btn {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    transition: all .15s;
+    flex-shrink: 0;
+  }
+  .mc-play  { background: var(--gold); color: #0f0e17; }
+  .mc-play:hover  { background: var(--gold-light); transform: scale(1.08); }
+  .mc-stop  { background: var(--surface); border: 1.5px solid var(--border); color: var(--text-muted); }
+  .mc-stop:hover  { border-color: var(--red); color: var(--red); }
+  .mc-progress { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .mc-bar-wrap {
+    height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; cursor: pointer;
+  }
+  .mc-bar-fill { height: 100%; background: var(--gold); border-radius: 99px; width: 0%; transition: width .3s linear; }
+  .mc-time { font-size: .72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+  /* Soundbar-Visualisierung */
+  .soundbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 28px;
+  }
+  .soundbar-bar {
+    width: 4px;
+    border-radius: 2px;
+    background: var(--gold);
+    animation: none;
+    height: 4px;
+    transition: height .1s;
+  }
+  .soundbar.playing .soundbar-bar:nth-child(1) { animation: sb 0.9s ease-in-out infinite; }
+  .soundbar.playing .soundbar-bar:nth-child(2) { animation: sb 0.7s ease-in-out infinite 0.15s; }
+  .soundbar.playing .soundbar-bar:nth-child(3) { animation: sb 1.1s ease-in-out infinite 0.05s; }
+  .soundbar.playing .soundbar-bar:nth-child(4) { animation: sb 0.8s ease-in-out infinite 0.2s; }
+  .soundbar.playing .soundbar-bar:nth-child(5) { animation: sb 1.0s ease-in-out infinite 0.1s; }
+  @keyframes sb {
+    0%,100% { height: 4px; }
+    50%      { height: 24px; }
+  }
   .answer-box {
     background: rgba(52,211,153,.07);
     border: 1.5px solid rgba(52,211,153,.25);
@@ -614,11 +671,54 @@ function renderQuestion(s) {
   document.getElementById('gmDdBadge').style.display = q.isDailyDouble ? 'inline-flex' : 'none';
   document.getElementById('gmQText').textContent = q.question || '';
   const media = document.getElementById('gmQMedia');
-  media.innerHTML = '';
-  if (q.mediaUrl) {
-    if (q.mediaType?.startsWith('image')) media.innerHTML = `<img src="${esc(q.mediaUrl)}" alt="">`;
-    else if (q.mediaType?.startsWith('video')) media.innerHTML = `<video controls src="${esc(q.mediaUrl)}"></video>`;
-    else if (q.mediaType?.startsWith('audio')) media.innerHTML = `<audio controls src="${esc(q.mediaUrl)}"></audio>`;
+  const prevUrl = media.dataset.url;
+  if (q.mediaUrl !== prevUrl) {
+    media.dataset.url = q.mediaUrl || '';
+    media.innerHTML = '';
+    if (q.mediaUrl) {
+      if (q.mediaType?.startsWith('image')) {
+        media.innerHTML = `<img src="${esc(q.mediaUrl)}" alt="">`;
+      } else if (q.mediaType?.startsWith('video')) {
+        media.innerHTML = `
+          <video id="gmVideo" src="${esc(q.mediaUrl)}" style="max-width:100%;border-radius:var(--radius-sm)"></video>
+          <div class="media-ctrl">
+            <div class="media-ctrl-row">
+              <button class="mc-btn mc-play" id="mcPlayBtn" onclick="mediaPlay()">▶</button>
+              <button class="mc-btn mc-stop" onclick="mediaStop()">■</button>
+              <div class="mc-progress">
+                <div class="mc-bar-wrap" onclick="mediaSeek(event, this)">
+                  <div class="mc-bar-fill" id="mcBar"></div>
+                </div>
+                <div class="mc-time" id="mcTime">0:00 / 0:00</div>
+              </div>
+            </div>
+          </div>`;
+        setupMediaSync('gmVideo');
+      } else if (q.mediaType?.startsWith('audio')) {
+        media.innerHTML = `
+          <audio id="gmAudio" src="${esc(q.mediaUrl)}"></audio>
+          <div class="media-ctrl">
+            <div class="media-ctrl-row">
+              <button class="mc-btn mc-play" id="mcPlayBtn" onclick="mediaPlay()">▶</button>
+              <button class="mc-btn mc-stop" onclick="mediaStop()">■</button>
+              <div class="mc-progress">
+                <div class="mc-bar-wrap" onclick="mediaSeek(event, this)">
+                  <div class="mc-bar-fill" id="mcBar"></div>
+                </div>
+                <div class="mc-time" id="mcTime">0:00 / 0:00</div>
+              </div>
+            </div>
+            <div class="soundbar" id="gmSoundbar">
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+            </div>
+          </div>`;
+        setupMediaSync('gmAudio');
+      }
+    }
   }
 
   const buzzerBox = document.getElementById('buzzerBox');
@@ -654,6 +754,83 @@ function renderEnd(s) {
       <span class="final-name">${esc(p.name)}</span>
       <span class="final-score ${p.score<0?'neg':''}">$${p.score}</span>
     </div>`).join('');
+}
+
+// ── MEDIA SYNC ────────────────────────────────────────────────────────────────
+let _mediaEl = null;
+let _mediaTimer = null;
+
+function getMedia() {
+  return document.getElementById('gmVideo') || document.getElementById('gmAudio');
+}
+
+function setupMediaSync(id) {
+  _mediaEl = null;
+  clearInterval(_mediaTimer);
+  const el = document.getElementById(id);
+  if (!el) return;
+  _mediaEl = el;
+  el.addEventListener('timeupdate', updateMediaBar);
+  el.addEventListener('ended', () => {
+    document.getElementById('mcPlayBtn').textContent = '▶';
+    const sb = document.getElementById('gmSoundbar');
+    if (sb) sb.classList.remove('playing');
+  });
+}
+
+function updateMediaBar() {
+  const el = getMedia();
+  if (!el || !el.duration) return;
+  const pct = (el.currentTime / el.duration) * 100;
+  const bar = document.getElementById('mcBar');
+  const time = document.getElementById('mcTime');
+  if (bar) bar.style.width = pct + '%';
+  if (time) time.textContent = fmtTime(el.currentTime) + ' / ' + fmtTime(el.duration);
+}
+
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  const ss = Math.floor(s % 60).toString().padStart(2, '0');
+  return m + ':' + ss;
+}
+
+function mediaPlay() {
+  const el = getMedia();
+  if (!el) return;
+  if (el.paused) {
+    el.play();
+    document.getElementById('mcPlayBtn').textContent = '⏸';
+    const sb = document.getElementById('gmSoundbar');
+    if (sb) sb.classList.add('playing');
+    socket.emit('gm:media', { action: 'play', time: el.currentTime });
+  } else {
+    el.pause();
+    document.getElementById('mcPlayBtn').textContent = '▶';
+    const sb = document.getElementById('gmSoundbar');
+    if (sb) sb.classList.remove('playing');
+    socket.emit('gm:media', { action: 'pause', time: el.currentTime });
+  }
+}
+
+function mediaStop() {
+  const el = getMedia();
+  if (!el) return;
+  el.pause();
+  el.currentTime = 0;
+  document.getElementById('mcPlayBtn').textContent = '▶';
+  const sb = document.getElementById('gmSoundbar');
+  if (sb) sb.classList.remove('playing');
+  updateMediaBar();
+  socket.emit('gm:media', { action: 'stop', time: 0 });
+}
+
+function mediaSeek(e, wrap) {
+  const el = getMedia();
+  if (!el || !el.duration) return;
+  const pct = e.offsetX / wrap.offsetWidth;
+  const t = pct * el.duration;
+  el.currentTime = t;
+  socket.emit('gm:media', { action: 'seek', time: t });
 }
 
 async function logout() {

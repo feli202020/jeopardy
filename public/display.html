@@ -162,7 +162,44 @@
   }
   .q-media img { max-width: 100%; max-height: 260px; border-radius: var(--radius); }
   .q-media video { max-width: 80%; max-height: 260px; border-radius: var(--radius); }
-  .q-media audio { width: 360px; }
+
+  /* Soundbar Display */
+  .soundbar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 40px 60px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    min-width: 320px;
+  }
+  .soundbar-label { font-size: .8rem; text-transform: uppercase; letter-spacing: 3px; color: var(--text-muted); font-weight: 700; }
+  .soundbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 7px;
+    height: 72px;
+  }
+  .soundbar-bar {
+    width: 10px;
+    border-radius: 5px;
+    background: var(--gold);
+    height: 6px;
+    box-shadow: 0 0 8px rgba(245,200,66,.4);
+  }
+  .soundbar.playing .soundbar-bar:nth-child(1) { animation: sb 0.9s ease-in-out infinite; }
+  .soundbar.playing .soundbar-bar:nth-child(2) { animation: sb 0.7s ease-in-out infinite 0.15s; }
+  .soundbar.playing .soundbar-bar:nth-child(3) { animation: sb 1.1s ease-in-out infinite 0.05s; }
+  .soundbar.playing .soundbar-bar:nth-child(4) { animation: sb 0.8s ease-in-out infinite 0.2s; }
+  .soundbar.playing .soundbar-bar:nth-child(5) { animation: sb 1.0s ease-in-out infinite 0.1s; }
+  .soundbar.playing .soundbar-bar:nth-child(6) { animation: sb 0.85s ease-in-out infinite 0.08s; }
+  .soundbar.playing .soundbar-bar:nth-child(7) { animation: sb 1.2s ease-in-out infinite 0.18s; }
+  @keyframes sb {
+    0%,100% { height: 6px; opacity: .4; }
+    50%      { height: 66px; opacity: 1; }
+  }
 
   /* ── BUZZER BANNER ── */
   #buzzerBanner {
@@ -298,6 +335,27 @@ function show(viewId) {
 
 socket.on('room:update', render);
 
+socket.on('media:sync', ({ action, time }) => {
+  const el = document.getElementById('dispAudio') || document.getElementById('dispVideo');
+  const sb = document.getElementById('dispSoundbar');
+  if (!el) return;
+  if (action === 'play') {
+    el.currentTime = time;
+    el.play();
+    if (sb) sb.classList.add('playing');
+  } else if (action === 'pause') {
+    el.pause();
+    el.currentTime = time;
+    if (sb) sb.classList.remove('playing');
+  } else if (action === 'stop') {
+    el.pause();
+    el.currentTime = 0;
+    if (sb) sb.classList.remove('playing');
+  } else if (action === 'seek') {
+    el.currentTime = time;
+  }
+});
+
 function render(s) {
   document.getElementById('waiting').style.display = 'none';
   document.getElementById('main').classList.add('active');
@@ -364,11 +422,31 @@ function renderQuestion(s) {
   document.getElementById('dispQText').textContent = q.question || '';
 
   const media = document.getElementById('dispQMedia');
-  media.innerHTML = '';
-  if (q.mediaUrl) {
-    if (q.mediaType?.startsWith('image')) media.innerHTML = `<img src="${esc(q.mediaUrl)}" alt="">`;
-    else if (q.mediaType?.startsWith('video')) media.innerHTML = `<video controls src="${esc(q.mediaUrl)}"></video>`;
-    else if (q.mediaType?.startsWith('audio')) media.innerHTML = `<audio controls src="${esc(q.mediaUrl)}"></audio>`;
+  if (media.dataset.url !== (q.mediaUrl || '')) {
+    media.dataset.url = q.mediaUrl || '';
+    media.innerHTML = '';
+    if (q.mediaUrl) {
+      if (q.mediaType?.startsWith('image')) {
+        media.innerHTML = `<img src="${esc(q.mediaUrl)}" alt="">`;
+      } else if (q.mediaType?.startsWith('video')) {
+        media.innerHTML = `<video id="dispVideo" src="${esc(q.mediaUrl)}" style="max-width:80%;max-height:260px;border-radius:var(--radius)"></video>`;
+      } else if (q.mediaType?.startsWith('audio')) {
+        media.innerHTML = `
+          <audio id="dispAudio" src="${esc(q.mediaUrl)}"></audio>
+          <div class="soundbar-wrap">
+            <div class="soundbar-label">🎵 Audio</div>
+            <div class="soundbar" id="dispSoundbar">
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+              <div class="soundbar-bar"></div>
+            </div>
+          </div>`;
+      }
+    }
   }
 }
 

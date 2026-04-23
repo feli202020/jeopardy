@@ -244,7 +244,7 @@
   <div id="questionView">
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center">
       <div class="q-value-pill" id="dispQValue"></div>
-      <div class="dd-badge" id="dispDdBadge" style="display:none">★ Daily Double</div>
+      <div class="dd-badge" id="dispDdBadge" style="display:none"></div>
     </div>
     <div class="q-text" id="dispQText"></div>
     <div class="q-media" id="dispQMedia"></div>
@@ -349,7 +349,7 @@ function renderBoard(s) {
     col.appendChild(hdr);
     cat.questions.forEach(q => {
       const cell = document.createElement('div');
-      cell.className = 'board-cell' + (q.answered ? ' answered' : '') + (q.isDailyDouble ? ' dd-marker' : '');
+      cell.className = 'board-cell' + (q.answered ? ' answered' : '');
       cell.textContent = q.answered ? '' : `$${q.value}`;
       col.appendChild(cell);
     });
@@ -359,8 +359,8 @@ function renderBoard(s) {
 
 function renderQuestion(s) {
   const q = s.activeQuestion;
-  document.getElementById('dispQValue').textContent = q.isDailyDouble ? `★ $${q.value} (×2)` : `$${q.value}`;
-  document.getElementById('dispDdBadge').style.display = q.isDailyDouble ? 'inline-flex' : 'none';
+  document.getElementById('dispQValue').textContent = `$${q.value}`;
+  document.getElementById('dispDdBadge').style.display = 'none';
   document.getElementById('dispQText').textContent = q.question || '';
 
   const media = document.getElementById('dispQMedia');

@@ -435,4 +435,14 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
-server.listen(PORT, HOST, () => console.log(`Jeopardy server running on http://${HOST}:${PORT}`));
+server.listen(PORT, HOST, () => {
+  console.log(`Jeopardy server running on http://${HOST}:${PORT}`);
+
+  // Keep-alive: verhindert dass Render Free Plan den Server einschläfert
+  if (process.env.RENDER_EXTERNAL_URL) {
+    setInterval(() => {
+      const url = process.env.RENDER_EXTERNAL_URL + '/api/auth/check';
+      fetch(url).catch(() => {});
+    }, 10 * 60 * 1000); // alle 10 Minuten
+  }
+});

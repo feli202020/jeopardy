@@ -8,6 +8,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
+app.set('trust proxy', 1); // Render / andere Reverse-Proxies
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 50e6 });
 

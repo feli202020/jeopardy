@@ -187,7 +187,7 @@
 <div class="content">
   <div id="waiting">
     <div class="icon">⏳</div>
-    <p>Warte auf Spielstart…</p>
+    <p id="waitingMsg">Warte auf Spielstart…</p>
   </div>
 
   <div id="qCard" class="q-card" style="display:none">
@@ -230,11 +230,22 @@
 const socket = io();
 const code = new URLSearchParams(location.search).get('code');
 
-socket.on('connect', () => {
-  if (code) socket.emit('observer:join', { code, type: 'answers' }, (res) => {
-    if (res?.state) render(res.state);
+function joinAsObserver() {
+  if (!code) {
+    document.getElementById('waitingMsg').textContent = 'Kein Code in der URL — öffne diesen Tab über den Gamemaster.';
+    return;
+  }
+  socket.emit('observer:join', { code, type: 'answers' }, (res) => {
+    if (res?.error) document.getElementById('waitingMsg').textContent = res.error;
+    else if (res?.state) render(res.state);
   });
-});
+}
+
+if (socket.connected) {
+  joinAsObserver();
+} else {
+  socket.on('connect', joinAsObserver);
+}
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

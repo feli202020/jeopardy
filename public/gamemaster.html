@@ -360,7 +360,7 @@
   <div class="topbar-badge" id="topbarBadge" style="display:none">Code: <span id="topbarCode">---</span></div>
   <div class="topbar-right" id="topbarRight">
     <a id="linkDisplay" href="/display.html" target="_blank" class="topbar-link display">⬛ Display</a>
-    <a id="linkAnswers" href="/answers.html" target="_blank" class="topbar-link answers">🔑 Antworten</a>
+    <button class="topbar-link" onclick="logout()" style="cursor:pointer;font-family:inherit">🚪 Logout</button>
   </div>
 </div>
 
@@ -653,6 +653,11 @@ function renderEnd(s) {
       <span class="final-name">${esc(p.name)}</span>
       <span class="final-score ${p.score<0?'neg':''}">$${p.score}</span>
     </div>`).join('');
+}
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/login.html';
 }
 
 loadQuizList();

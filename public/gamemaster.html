@@ -533,13 +533,14 @@ function endGame() {
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 socket.on('room:update', updateState);
-socket.on('game:closed', () => location.reload());
+socket.on('game:closed', () => { toast('Spiel beendet', '', 2000); setTimeout(() => location.reload(), 2000); });
 
 function updateState(s) {
   state = s;
   const phase = s.phase;
 
   if (phase === 'lobby') {
+    showPage('pageLobby');
     renderLobby(s);
   } else if (phase === 'end') {
     renderEnd(s);

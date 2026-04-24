@@ -242,7 +242,7 @@
   .board-cell.buzzed-here { border-color: var(--green); box-shadow: 0 0 8px rgba(52,211,153,.35); color: var(--green); }
 
   /* ── QUESTION PAGE ── */
-  .question-page { flex: 1; display: flex; flex-direction: column; gap: 20px; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .question-page { flex: 1; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center; padding: 8px 0; overflow-y: auto; }
   .q-top { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .q-value-badge {
     background: var(--surface);
@@ -268,48 +268,9 @@
     box-shadow: 0 0 30px rgba(245,200,66,.25);
   }
   .q-media { width: 100%; text-align: center; }
-  .q-media img { max-width: 100%; max-height: 260px; border-radius: var(--radius); object-fit: contain; }
-  .q-media video { max-width: 100%; max-height: 240px; border-radius: var(--radius); }
+  .q-media img { max-width: 100%; max-height: 220px; border-radius: var(--radius); object-fit: contain; }
+  .q-media video { max-width: 100%; max-height: 220px; border-radius: var(--radius); }
 
-  /* Soundbar */
-  .soundbar-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    padding: 24px 16px;
-    background: var(--surface);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius);
-    width: 100%;
-    max-width: 320px;
-    margin: 0 auto;
-  }
-  .soundbar-label { font-size: .75rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); font-weight: 700; }
-  .soundbar {
-    display: flex;
-    align-items: flex-end;
-    gap: 5px;
-    height: 48px;
-  }
-  .soundbar-bar {
-    width: 6px;
-    border-radius: 3px;
-    background: var(--gold);
-    height: 4px;
-  }
-  .soundbar.playing .soundbar-bar:nth-child(1) { animation: sb 0.9s ease-in-out infinite; }
-  .soundbar.playing .soundbar-bar:nth-child(2) { animation: sb 0.7s ease-in-out infinite 0.15s; }
-  .soundbar.playing .soundbar-bar:nth-child(3) { animation: sb 1.1s ease-in-out infinite 0.05s; }
-  .soundbar.playing .soundbar-bar:nth-child(4) { animation: sb 0.8s ease-in-out infinite 0.2s; }
-  .soundbar.playing .soundbar-bar:nth-child(5) { animation: sb 1.0s ease-in-out infinite 0.1s; }
-  .soundbar.playing .soundbar-bar:nth-child(6) { animation: sb 0.85s ease-in-out infinite 0.08s; }
-  .soundbar.playing .soundbar-bar:nth-child(7) { animation: sb 1.2s ease-in-out infinite 0.18s; }
-  @keyframes sb {
-    0%,100% { height: 4px; opacity: .5; }
-    50%      { height: 44px; opacity: 1; }
-  }
-  .soundbar-status { font-size: .85rem; color: var(--text-muted); }
   .q-text {
     font-size: clamp(1.3rem, 4vw, 2rem);
     font-weight: 700;
@@ -367,6 +328,7 @@
     min-height: 32px;
   }
   .buzzed-announce.is-me { color: var(--green); }
+
 
   /* ── END ── */
   .end-page {
@@ -509,6 +471,7 @@
   </div>
 </div>
 
+
 <!-- END -->
 <div id="pageEnd" class="page">
   <div class="end-page">
@@ -581,30 +544,6 @@ function buzz() {
 socket.on('room:update', updateState);
 socket.on('game:closed', (d) => { toast(d.reason || 'Spiel beendet'); setTimeout(() => location.reload(), 3000); });
 
-socket.on('media:sync', ({ action, time }) => {
-  const el = document.getElementById('playerAudio') || document.getElementById('playerVideo');
-  const sb = document.getElementById('playerSoundbar');
-  const st = document.getElementById('playerSoundStatus');
-  if (!el) return;
-  if (action === 'play') {
-    el.currentTime = time;
-    el.play();
-    if (sb) sb.classList.add('playing');
-    if (st) st.textContent = '▶ Wird abgespielt…';
-  } else if (action === 'pause') {
-    el.pause();
-    el.currentTime = time;
-    if (sb) sb.classList.remove('playing');
-    if (st) st.textContent = '⏸ Pausiert';
-  } else if (action === 'stop') {
-    el.pause();
-    el.currentTime = 0;
-    if (sb) sb.classList.remove('playing');
-    if (st) st.textContent = 'Warte auf Gamemaster…';
-  } else if (action === 'seek') {
-    el.currentTime = time;
-  }
-});
 
 function updateState(s) {
   if (s.phase === 'lobby') {
@@ -676,34 +615,7 @@ function renderQuestion(s) {
   document.getElementById('playerDdBadge').style.display = q.isDailyDouble ? 'block' : 'none';
   document.getElementById('playerQText').textContent = q.question || '';
 
-  const media = document.getElementById('playerMedia');
-  if (media.dataset.url !== (q.mediaUrl || '')) {
-    media.dataset.url = q.mediaUrl || '';
-    media.innerHTML = '';
-    if (q.mediaUrl) {
-      if (q.mediaType?.startsWith('image')) {
-        media.innerHTML = `<img src="${esc(q.mediaUrl)}" alt="">`;
-      } else if (q.mediaType?.startsWith('video')) {
-        media.innerHTML = `<video id="playerVideo" src="${esc(q.mediaUrl)}" style="max-width:100%;max-height:240px;border-radius:var(--radius)"></video>`;
-      } else if (q.mediaType?.startsWith('audio')) {
-        media.innerHTML = `
-          <audio id="playerAudio" src="${esc(q.mediaUrl)}"></audio>
-          <div class="soundbar-wrap">
-            <div class="soundbar-label">🎵 Audio</div>
-            <div class="soundbar" id="playerSoundbar">
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-            </div>
-            <div class="soundbar-status" id="playerSoundStatus">Warte auf Gamemaster…</div>
-          </div>`;
-      }
-    }
-  }
+  document.getElementById('playerMedia').innerHTML = '';
 
   const btn = document.getElementById('buzzerBtn');
   const status = document.getElementById('buzzerStatus');
@@ -737,6 +649,7 @@ function renderQuestion(s) {
     }
   }
 }
+
 
 function renderEnd(s) {
   const sorted = [...s.players].sort((a, b) => b.score - a.score);

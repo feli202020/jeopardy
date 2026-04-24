@@ -3,7 +3,9 @@
     "allow": [
       "Bash(node -e ' *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Bash(node --check server.js)"
     ]
   }
 }

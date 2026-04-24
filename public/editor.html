@@ -291,6 +291,7 @@
   .upload-bar { height: 3px; background: var(--surface2); border-radius: 99px; overflow: hidden; display: none; }
   .upload-bar-fill { height: 100%; background: var(--gold); width: 0; transition: width .2s; border-radius: 99px; }
 
+
   .add-q-row { display: flex; gap: 8px; align-items: center; }
   .add-pts-input {
     background: var(--surface);
@@ -441,9 +442,11 @@ function addCategory() {
   selectCat(quiz.categories.length - 1);
 }
 
+
 function defaultQuestions() {
   return [200, 400, 600, 800, 1000].map(v => ({ value: v, question: '', answer: '', isDailyDouble: false, mediaType: null, mediaUrl: null }));
 }
+
 
 function deleteCat(idx) {
   if (!confirm('Kategorie löschen?')) return;
@@ -597,6 +600,7 @@ function addQuestion(ci) {
   quiz.categories[ci].questions.push({ value: val, question: '', answer: '', isDailyDouble: false, mediaType: null, mediaUrl: null });
   renderQuestions(ci);
 }
+
 
 function deleteQ(ci, qi) {
   if (!confirm('Frage löschen?')) return;

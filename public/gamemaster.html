@@ -248,7 +248,7 @@
   }
   .q-text { font-size: 1.1rem; font-weight: 700; line-height: 1.4; margin-bottom: 10px; }
   .q-media { margin-bottom: 10px; }
-  .q-media img { max-width: 100%; max-height: 160px; border-radius: var(--radius-sm); }
+  .q-media img { max-width: 100%; max-height: 260px; border-radius: var(--radius-sm); }
   .q-media video { max-width: 100%; border-radius: var(--radius-sm); }
 
   /* ── MEDIA CONTROLS ── */
@@ -390,6 +390,7 @@
   .final-score { font-family: 'Oswald', sans-serif; font-size: 1.3rem; color: var(--gold); }
   .final-score.neg { color: var(--red); }
 
+
   /* ── TOAST ── */
   #toast {
     position: fixed;
@@ -458,7 +459,11 @@
         </div>
         <div class="q-text" id="gmQText"></div>
         <div class="q-media" id="gmQMedia"></div>
-<div id="buzzerBox" class="buzzer-box" style="display:none">
+        <div class="answer-box" id="gmAnswerBox" style="display:none">
+          <div class="answer-label">Antwort</div>
+          <div class="answer-text" id="gmAnswerText"></div>
+        </div>
+        <div id="buzzerBox" class="buzzer-box" style="display:none">
           <div class="buzzer-box-label">Erster Buzzer</div>
           <div class="buzzer-name" id="gmBuzzerName"></div>
         </div>
@@ -473,6 +478,8 @@
           <button class="btn btn-ghost" style="margin-left:auto" onclick="skipQuestion()">Frage überspringen</button>
         </div>
       </div>
+
+
     </div>
     <div class="sidebar">
       <div class="sidebar-card">
@@ -559,7 +566,6 @@ function createRoom(quizId) {
     document.getElementById('topbarBadge').style.display = 'flex';
     document.getElementById('topbarCode').textContent = res.code;
     document.getElementById('linkDisplay').href = `/display.html?code=${res.code}`;
-    document.getElementById('linkAnswers').href = `/answers.html?code=${res.code}`;
     updateState(res.state);
     showPage('pageLobby');
   });
@@ -670,6 +676,14 @@ function renderQuestion(s) {
   document.getElementById('gmQValue').textContent = q.isDailyDouble ? `★ $${q.value} (×2)` : `$${q.value}`;
   document.getElementById('gmDdBadge').style.display = q.isDailyDouble ? 'inline-flex' : 'none';
   document.getElementById('gmQText').textContent = q.question || '';
+  const answerBox = document.getElementById('gmAnswerBox');
+  const answerText = document.getElementById('gmAnswerText');
+  if (q.answer) {
+    answerText.textContent = q.answer;
+    answerBox.style.display = 'block';
+  } else {
+    answerBox.style.display = 'none';
+  }
   const media = document.getElementById('gmQMedia');
   const prevUrl = media.dataset.url;
   if (q.mediaUrl !== prevUrl) {
@@ -678,9 +692,10 @@ function renderQuestion(s) {
     if (q.mediaUrl) {
       if (q.mediaType?.startsWith('image')) {
         media.innerHTML = `<img src="${esc(q.mediaUrl)}" alt="">`;
-      } else if (q.mediaType?.startsWith('video')) {
+      } else if (q.mediaType?.startsWith('video') || q.mediaType?.startsWith('audio')) {
+        const tag = q.mediaType.startsWith('video') ? 'video' : 'audio';
         media.innerHTML = `
-          <video id="gmVideo" src="${esc(q.mediaUrl)}" style="max-width:100%;border-radius:var(--radius-sm)"></video>
+          <${tag} id="gmMediaEl" src="${esc(q.mediaUrl)}" muted preload="metadata" style="display:none"></${tag}>
           <div class="media-ctrl">
             <div class="media-ctrl-row">
               <button class="mc-btn mc-play" id="mcPlayBtn" onclick="mediaPlay()">▶</button>
@@ -693,30 +708,7 @@ function renderQuestion(s) {
               </div>
             </div>
           </div>`;
-        setupMediaSync('gmVideo');
-      } else if (q.mediaType?.startsWith('audio')) {
-        media.innerHTML = `
-          <audio id="gmAudio" src="${esc(q.mediaUrl)}"></audio>
-          <div class="media-ctrl">
-            <div class="media-ctrl-row">
-              <button class="mc-btn mc-play" id="mcPlayBtn" onclick="mediaPlay()">▶</button>
-              <button class="mc-btn mc-stop" onclick="mediaStop()">■</button>
-              <div class="mc-progress">
-                <div class="mc-bar-wrap" onclick="mediaSeek(event, this)">
-                  <div class="mc-bar-fill" id="mcBar"></div>
-                </div>
-                <div class="mc-time" id="mcTime">0:00 / 0:00</div>
-              </div>
-            </div>
-            <div class="soundbar" id="gmSoundbar">
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-              <div class="soundbar-bar"></div>
-            </div>
-          </div>`;
-        setupMediaSync('gmAudio');
+        setupMediaSync('gmMediaEl');
       }
     }
   }
@@ -761,7 +753,7 @@ let _mediaEl = null;
 let _mediaTimer = null;
 
 function getMedia() {
-  return document.getElementById('gmVideo') || document.getElementById('gmAudio');
+  return document.getElementById('gmMediaEl');
 }
 
 function setupMediaSync(id) {
@@ -773,8 +765,6 @@ function setupMediaSync(id) {
   el.addEventListener('timeupdate', updateMediaBar);
   el.addEventListener('ended', () => {
     document.getElementById('mcPlayBtn').textContent = '▶';
-    const sb = document.getElementById('gmSoundbar');
-    if (sb) sb.classList.remove('playing');
   });
 }
 
@@ -800,14 +790,10 @@ function mediaPlay() {
   if (el.paused) {
     el.play();
     document.getElementById('mcPlayBtn').textContent = '⏸';
-    const sb = document.getElementById('gmSoundbar');
-    if (sb) sb.classList.add('playing');
     socket.emit('gm:media', { action: 'play', time: el.currentTime });
   } else {
     el.pause();
     document.getElementById('mcPlayBtn').textContent = '▶';
-    const sb = document.getElementById('gmSoundbar');
-    if (sb) sb.classList.remove('playing');
     socket.emit('gm:media', { action: 'pause', time: el.currentTime });
   }
 }
@@ -818,8 +804,6 @@ function mediaStop() {
   el.pause();
   el.currentTime = 0;
   document.getElementById('mcPlayBtn').textContent = '▶';
-  const sb = document.getElementById('gmSoundbar');
-  if (sb) sb.classList.remove('playing');
   updateMediaBar();
   socket.emit('gm:media', { action: 'stop', time: 0 });
 }

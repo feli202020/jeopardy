@@ -211,7 +211,7 @@ function roomPublicState(room) {
       questions: cat.questions.map(q => ({
         value: q.value,
         answered: q.answered,
-        isDailyDouble: q.isDailyDouble
+        isDailyDouble: q.isDailyDouble,
       }))
     })),
     players: Object.values(room.players).map(p => ({
@@ -245,6 +245,11 @@ function gamemasterState(room) {
   return pub;
 }
 
+function broadcastRoom(room) {
+  io.to(room.code).emit('room:update', roomPublicState(room));
+  io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+}
+
 // ─── SOCKET EVENTS ───────────────────────────────────────────────────────────
 
 io.on('connection', (socket) => {
@@ -274,8 +279,7 @@ io.on('connection', (socket) => {
       if (room.buzzer === existing.socketId) room.buzzer = socket.id;
       room.lockedOut.delete(existing.socketId);
       socket.join(room.code);
-      io.to(room.code).emit('room:update', roomPublicState(room));
-      io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+      broadcastRoom(room);
       return cb({ ok: true, state: roomPublicState(room), playerId: socket.id, rejoined: true });
     }
 
@@ -287,8 +291,7 @@ io.on('connection', (socket) => {
 
     room.players[socket.id] = { name: playerName, score: 0, socketId: socket.id, online: true };
     socket.join(room.code);
-    io.to(room.code).emit('room:update', roomPublicState(room));
-    io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+    broadcastRoom(room);
     cb({ ok: true, state: roomPublicState(room), playerId: socket.id });
   });
 
@@ -305,8 +308,7 @@ io.on('connection', (socket) => {
     if (!room || room.gamemasterId !== socket.id) return;
     if (Object.keys(room.players).length === 0) return cb?.({ error: 'Keine Spieler' });
     room.phase = 'board';
-    io.to(room.code).emit('room:update', roomPublicState(room));
-    io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+    broadcastRoom(room);
     cb?.({ ok: true });
   });
 
@@ -321,8 +323,7 @@ io.on('connection', (socket) => {
     room.buzzOrder = [];
     room.lockedOut = new Set();
     room.phase = 'question';
-    io.to(room.code).emit('room:update', roomPublicState(room));
-    io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+    broadcastRoom(room);
     cb?.({ ok: true });
   });
 
@@ -335,8 +336,7 @@ io.on('connection', (socket) => {
     if (!room.buzzer) {
       room.buzzer = socket.id;
       room.phase = 'buzzed';
-      io.to(room.code).emit('room:update', roomPublicState(room));
-      io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+      broadcastRoom(room);
     }
     cb?.({ ok: true });
   });
@@ -352,30 +352,16 @@ io.on('connection', (socket) => {
     const pts = q.isDailyDouble ? q.value * 2 : q.value;
     if (correct) {
       player.score += pts;
-      q.answered = true;
-      room.phase = 'board';
-      room.activeQuestion = null;
-      room.buzzer = null;
-      room.buzzOrder = [];
-      room.lockedOut = new Set();
     } else {
       player.score -= pts;
-      room.lockedOut.add(buzzerId);
-      room.buzzer = null;
-      const activePlayers = Object.keys(room.players).filter(id => !room.lockedOut.has(id));
-      if (activePlayers.length === 0) {
-        q.answered = true;
-        room.phase = 'board';
-        room.activeQuestion = null;
-        room.buzzer = null;
-        room.buzzOrder = [];
-        room.lockedOut = new Set();
-      } else {
-        room.phase = 'question';
-      }
     }
-    io.to(room.code).emit('room:update', roomPublicState(room));
-    io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+    q.answered = true;
+    room.phase = 'board';
+    room.activeQuestion = null;
+    room.buzzer = null;
+    room.buzzOrder = [];
+    room.lockedOut = new Set();
+    broadcastRoom(room);
     cb?.({ ok: true });
   });
 
@@ -390,8 +376,7 @@ io.on('connection', (socket) => {
     room.buzzer = null;
     room.buzzOrder = [];
     room.lockedOut = new Set();
-    io.to(room.code).emit('room:update', roomPublicState(room));
-    io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+    broadcastRoom(room);
     cb?.({ ok: true });
   });
 
@@ -407,8 +392,7 @@ io.on('connection', (socket) => {
     const room = getRoomBySocket(socket.id);
     if (!room || room.gamemasterId !== socket.id) return;
     room.phase = 'end';
-    io.to(room.code).emit('room:update', roomPublicState(room));
-    io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+    broadcastRoom(room);
     cb?.({ ok: true });
   });
 
@@ -435,8 +419,7 @@ io.on('connection', (socket) => {
           room.lockedOut = new Set();
         }
       }
-      io.to(room.code).emit('room:update', roomPublicState(room));
-      io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+      broadcastRoom(room);
     }
   });
 });

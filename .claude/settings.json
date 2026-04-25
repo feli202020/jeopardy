@@ -5,7 +5,8 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(git commit *)",
-      "Bash(node --check server.js)"
+      "Bash(node --check server.js)",
+      "Bash(grep -E \"\\\\.\\(js|html\\)$\")"
     ]
   }
 }

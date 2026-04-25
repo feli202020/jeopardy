@@ -465,7 +465,7 @@ function renderQuestion(s) {
   const q = s.activeQuestion;
   document.getElementById('dispQValue').textContent = `$${q.value}`;
   document.getElementById('dispDdBadge').style.display = 'none';
-  document.getElementById('dispQText').textContent = q.question || '';
+  document.getElementById('dispQText').textContent = s.questionRevealed ? (q.question || '') : '';
 
   const media = document.getElementById('dispQMedia');
   if (media.dataset.url !== (q.mediaUrl || '')) {

@@ -463,6 +463,11 @@
           <div class="answer-label">Antwort</div>
           <div class="answer-text" id="gmAnswerText"></div>
         </div>
+        <div id="revealRow" class="wait-row" style="display:none">
+          <span>Frage noch verborgen</span>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="revealQuestion()">Frage freigeben</button>
+          <button class="btn btn-ghost" onclick="skipQuestion()">Frage überspringen</button>
+        </div>
         <div id="buzzerBox" class="buzzer-box" style="display:none">
           <div class="buzzer-box-label">Erster Buzzer</div>
           <div class="buzzer-name" id="gmBuzzerName"></div>
@@ -589,6 +594,10 @@ function skipQuestion() {
   socket.emit('gm:skip_question');
 }
 
+function revealQuestion() {
+  socket.emit('gm:reveal_question');
+}
+
 function endGame() {
   if (!confirm('Spiel wirklich beenden?')) return;
   socket.emit('gm:end_game');
@@ -713,17 +722,25 @@ function renderQuestion(s) {
     }
   }
 
+  const revealRow = document.getElementById('revealRow');
   const buzzerBox = document.getElementById('buzzerBox');
   const judgeRow = document.getElementById('judgeRow');
   const waitRow = document.getElementById('waitRow');
 
   if (s.phase === 'buzzed' && s.buzzer) {
-    const alreadyShown = buzzerBox.style.display === 'block' && document.getElementById('gmBuzzerName').textContent === s.buzzer;
+    revealRow.style.display = 'none';
     buzzerBox.style.display = 'block';
     document.getElementById('gmBuzzerName').textContent = s.buzzer;
     judgeRow.style.display = 'flex';
     waitRow.style.display = 'none';
+  } else if (!s.questionRevealed) {
+    // Text question not yet revealed to players
+    revealRow.style.display = 'flex';
+    buzzerBox.style.display = 'none';
+    judgeRow.style.display = 'none';
+    waitRow.style.display = 'none';
   } else {
+    revealRow.style.display = 'none';
     buzzerBox.style.display = 'none';
     judgeRow.style.display = 'none';
     waitRow.style.display = 'flex';

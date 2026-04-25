@@ -613,7 +613,7 @@ function renderQuestion(s) {
   if (!q) return;
   document.getElementById('qValueBadge').textContent = q.isDailyDouble ? '★ $' + q.value : '$' + q.value;
   document.getElementById('playerDdBadge').style.display = q.isDailyDouble ? 'block' : 'none';
-  document.getElementById('playerQText').textContent = q.question || '';
+  document.getElementById('playerQText').textContent = s.questionRevealed ? (q.question || '') : '';
 
   document.getElementById('playerMedia').innerHTML = '';
 
@@ -621,10 +621,11 @@ function renderQuestion(s) {
   const status = document.getElementById('buzzerStatus');
   const announce = document.getElementById('buzzedAnnounce');
 
+  // Buzzer only usable after question is revealed
   if (s.phase === 'question') {
-    btn.disabled = false;
+    btn.disabled = !s.questionRevealed;
     btn.className = 'buzzer-btn';
-    status.textContent = 'Drücke BUZZ wenn du die Antwort weißt!';
+    status.textContent = s.questionRevealed ? 'Drücke BUZZ wenn du die Antwort weißt!' : 'Warte auf den Gamemaster…';
     announce.textContent = '';
     announce.className = 'buzzed-announce';
   } else if (s.phase === 'buzzed') {

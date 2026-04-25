@@ -224,8 +224,10 @@ function roomPublicState(room) {
       isDailyDouble: activeQ(room)?.isDailyDouble,
       mediaType: activeQ(room)?.mediaType,
       mediaUrl: activeQ(room)?.mediaUrl,
-      question: activeQ(room)?.question,
+      // Only reveal question text to players after GM releases it
+      question: room.questionRevealed ? activeQ(room)?.question : null,
     } : null,
+    questionRevealed: !!room.questionRevealed,
     buzzer: room.buzzer ? room.players[room.buzzer]?.name : null,
     buzzOrder: room.buzzOrder.map(id => room.players[id]?.name).filter(Boolean),
   };
@@ -240,7 +242,12 @@ function activeQ(room) {
 function gamemasterState(room) {
   const pub = roomPublicState(room);
   if (room.activeQuestion) {
-    pub.activeQuestion = { ...pub.activeQuestion, answer: activeQ(room)?.answer };
+    // GM always sees the full question text and answer, regardless of reveal state
+    pub.activeQuestion = {
+      ...pub.activeQuestion,
+      question: activeQ(room)?.question,
+      answer: activeQ(room)?.answer,
+    };
   }
   return pub;
 }
@@ -323,6 +330,17 @@ io.on('connection', (socket) => {
     room.buzzOrder = [];
     room.lockedOut = new Set();
     room.phase = 'question';
+    // Text questions are hidden until GM reveals them; media questions show immediately
+    room.questionRevealed = !!(q.mediaUrl);
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  socket.on('gm:reveal_question', (_, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    if (room.phase !== 'question') return;
+    room.questionRevealed = true;
     broadcastRoom(room);
     cb?.({ ok: true });
   });
@@ -331,6 +349,7 @@ io.on('connection', (socket) => {
     const room = getRoomBySocket(socket.id);
     if (!room || !room.players[socket.id]) return;
     if (room.phase !== 'question') return;
+    if (!room.questionRevealed) return cb?.({ error: 'Frage noch nicht freigegeben' });
     if (room.lockedOut.has(socket.id)) return cb?.({ error: 'Du bist gesperrt' });
     if (!room.buzzOrder.includes(socket.id)) room.buzzOrder.push(socket.id);
     if (!room.buzzer) {
@@ -352,15 +371,20 @@ io.on('connection', (socket) => {
     const pts = q.isDailyDouble ? q.value * 2 : q.value;
     if (correct) {
       player.score += pts;
+      q.answered = true;
+      room.phase = 'board';
+      room.activeQuestion = null;
+      room.buzzer = null;
+      room.buzzOrder = [];
+      room.lockedOut = new Set();
+      room.questionRevealed = false;
     } else {
       player.score -= pts;
+      // Lock out the wrong answerer, reopen buzzer for others
+      room.lockedOut.add(buzzerId);
+      room.buzzer = null;
+      room.phase = 'question';
     }
-    q.answered = true;
-    room.phase = 'board';
-    room.activeQuestion = null;
-    room.buzzer = null;
-    room.buzzOrder = [];
-    room.lockedOut = new Set();
     broadcastRoom(room);
     cb?.({ ok: true });
   });
@@ -376,6 +400,7 @@ io.on('connection', (socket) => {
     room.buzzer = null;
     room.buzzOrder = [];
     room.lockedOut = new Set();
+    room.questionRevealed = false;
     broadcastRoom(room);
     cb?.({ ok: true });
   });

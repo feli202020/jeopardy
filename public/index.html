@@ -621,11 +621,17 @@ function renderQuestion(s) {
   const status = document.getElementById('buzzerStatus');
   const announce = document.getElementById('buzzedAnnounce');
 
-  // Buzzer only usable after question is revealed
+  // Buzzer only usable after question is revealed and not closed
   if (s.phase === 'question') {
-    btn.disabled = !s.questionRevealed;
+    btn.disabled = !s.questionRevealed || s.buzzerClosed;
     btn.className = 'buzzer-btn';
-    status.textContent = s.questionRevealed ? 'Drücke BUZZ wenn du die Antwort weißt!' : 'Warte auf den Gamemaster…';
+    if (!s.questionRevealed) {
+      status.textContent = 'Warte auf den Gamemaster…';
+    } else if (s.buzzerClosed) {
+      status.textContent = 'Buzzer gesperrt — niemand hat die Frage gewusst.';
+    } else {
+      status.textContent = 'Drücke BUZZ wenn du die Antwort weißt!';
+    }
     announce.textContent = '';
     announce.className = 'buzzed-announce';
   } else if (s.phase === 'buzzed') {

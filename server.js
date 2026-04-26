@@ -228,6 +228,7 @@ function roomPublicState(room) {
       question: room.questionRevealed ? activeQ(room)?.question : null,
     } : null,
     questionRevealed: !!room.questionRevealed,
+    buzzerClosed: !!room.buzzerClosed,
     buzzer: room.buzzer ? room.players[room.buzzer]?.name : null,
     buzzOrder: room.buzzOrder.map(id => room.players[id]?.name).filter(Boolean),
   };
@@ -330,8 +331,8 @@ io.on('connection', (socket) => {
     room.buzzOrder = [];
     room.lockedOut = new Set();
     room.phase = 'question';
-    // Text questions are hidden until GM reveals them; media questions show immediately
     room.questionRevealed = !!(q.mediaUrl);
+    room.buzzerClosed = false;
     broadcastRoom(room);
     cb?.({ ok: true });
   });
@@ -350,6 +351,7 @@ io.on('connection', (socket) => {
     if (!room || !room.players[socket.id]) return;
     if (room.phase !== 'question') return;
     if (!room.questionRevealed) return cb?.({ error: 'Frage noch nicht freigegeben' });
+    if (room.lockedOut.size >= 3) return cb?.({ error: 'Maximale Buzzer-Versuche erreicht' });
     if (room.lockedOut.has(socket.id)) return cb?.({ error: 'Du bist gesperrt' });
     if (!room.buzzOrder.includes(socket.id)) room.buzzOrder.push(socket.id);
     if (!room.buzzer) {
@@ -378,12 +380,14 @@ io.on('connection', (socket) => {
       room.buzzOrder = [];
       room.lockedOut = new Set();
       room.questionRevealed = false;
+      room.buzzerClosed = false;
     } else {
       player.score -= pts;
-      // Lock out the wrong answerer, reopen buzzer for others
+      // Lock out the wrong answerer; close buzzer entirely after 3 wrong answers
       room.lockedOut.add(buzzerId);
       room.buzzer = null;
       room.phase = 'question';
+      room.buzzerClosed = room.lockedOut.size >= 3;
     }
     broadcastRoom(room);
     cb?.({ ok: true });
@@ -401,6 +405,7 @@ io.on('connection', (socket) => {
     room.buzzOrder = [];
     room.lockedOut = new Set();
     room.questionRevealed = false;
+    room.buzzerClosed = false;
     broadcastRoom(room);
     cb?.({ ok: true });
   });

@@ -482,6 +482,10 @@
           <span>Warte auf Buzzer…</span>
           <button class="btn btn-ghost" style="margin-left:auto" onclick="skipQuestion()">Frage überspringen</button>
         </div>
+        <div class="wait-row" id="closedRow" style="display:none">
+          <span style="color:var(--danger,#e55)">&#9940; Buzzer gesperrt (3 Falschantworten)</span>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="skipQuestion()">Frage überspringen</button>
+        </div>
       </div>
 
 
@@ -726,23 +730,26 @@ function renderQuestion(s) {
   const buzzerBox = document.getElementById('buzzerBox');
   const judgeRow = document.getElementById('judgeRow');
   const waitRow = document.getElementById('waitRow');
+  const closedRow = document.getElementById('closedRow');
 
-  if (s.phase === 'buzzed' && s.buzzer) {
+  const hideAll = () => {
     revealRow.style.display = 'none';
+    buzzerBox.style.display = 'none';
+    judgeRow.style.display = 'none';
+    waitRow.style.display = 'none';
+    closedRow.style.display = 'none';
+  };
+
+  hideAll();
+  if (s.phase === 'buzzed' && s.buzzer) {
     buzzerBox.style.display = 'block';
     document.getElementById('gmBuzzerName').textContent = s.buzzer;
     judgeRow.style.display = 'flex';
-    waitRow.style.display = 'none';
   } else if (!s.questionRevealed) {
-    // Text question not yet revealed to players
     revealRow.style.display = 'flex';
-    buzzerBox.style.display = 'none';
-    judgeRow.style.display = 'none';
-    waitRow.style.display = 'none';
+  } else if (s.buzzerClosed) {
+    closedRow.style.display = 'flex';
   } else {
-    revealRow.style.display = 'none';
-    buzzerBox.style.display = 'none';
-    judgeRow.style.display = 'none';
     waitRow.style.display = 'flex';
   }
 }

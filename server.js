@@ -353,7 +353,8 @@ function startRoomTimer(room) {
     if (room.timer.remaining <= 0) {
       room.timer.running = false;
       clearRoomTimer(room);
-      // Emit a dedicated timeout event so clients can react
+      room.buzzerClosed = true;
+      broadcastRoom(room);
       io.to(room.code).emit('timer:timeout');
     }
   }, 1000);
@@ -432,7 +433,7 @@ io.on('connection', (socket) => {
     room.buzzOrder = [];
     room.lockedOut = new Set();
     room.phase = 'question';
-    room.questionRevealed = !!(q.mediaUrl);
+    room.questionRevealed = true;
     room.buzzerClosed = false;
     room.hintRevealed = false;
     // Reset timer if configured

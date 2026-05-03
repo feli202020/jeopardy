@@ -203,33 +203,53 @@
     50%      { height: 66px; opacity: 1; }
   }
 
-  /* ── TIMER OVERLAY ── */
+  /* ── TIMER RING ── */
   #timerOverlay {
     position: fixed;
     top: 60px; right: 24px;
-    background: var(--surface);
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 22px;
     display: none;
-    flex-direction: column;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
     z-index: 60;
-    min-width: 90px;
-    box-shadow: 0 4px 24px rgba(0,0,0,.5);
   }
   #timerOverlay.active { display: flex; }
-  #timerOverlay.urgent { border-color: var(--red); box-shadow: 0 0 30px rgba(248,113,113,.3); }
-  .timer-overlay-label { font-size: .65rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); font-weight: 700; }
-  .timer-overlay-value {
+  .timer-ring-wrap {
+    position: relative;
+    width: 110px;
+    height: 110px;
+  }
+  .timer-ring-svg {
+    width: 110px; height: 110px;
+    transform: rotate(-90deg);
+  }
+  .timer-ring-bg {
+    fill: none;
+    stroke: var(--surface2);
+    stroke-width: 8;
+  }
+  .timer-ring-fill {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 283;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.9s linear, stroke 0.3s;
+  }
+  .timer-ring-fill.urgent { stroke: var(--red); filter: drop-shadow(0 0 8px rgba(248,113,113,.7)); }
+  .timer-ring-value {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-family: 'Oswald', sans-serif;
-    font-size: 2.8rem;
+    font-size: 2rem;
     font-weight: 700;
     color: var(--gold);
     line-height: 1;
   }
-  .timer-overlay-value.urgent { color: var(--red); }
+  .timer-ring-value.urgent { color: var(--red); }
 
   /* ── HINT BANNER ── */
   #hintBanner {
@@ -370,8 +390,13 @@
 </div>
 
 <div id="timerOverlay">
-  <div class="timer-overlay-label">Zeit</div>
-  <div class="timer-overlay-value" id="timerOverlayValue">--</div>
+  <div class="timer-ring-wrap">
+    <svg class="timer-ring-svg" viewBox="0 0 100 100">
+      <circle class="timer-ring-bg" cx="50" cy="50" r="45"/>
+      <circle class="timer-ring-fill" id="timerRingFill" cx="50" cy="50" r="45"/>
+    </svg>
+    <div class="timer-ring-value" id="timerOverlayValue">--</div>
+  </div>
 </div>
 
 <div id="hintBanner">
@@ -488,16 +513,22 @@ function render(s) {
     banner.classList.remove('active');
   }
 
-  // Timer overlay
+  // Timer ring
   const timerOv = document.getElementById('timerOverlay');
   const timerVal = document.getElementById('timerOverlayValue');
+  const timerRingFill = document.getElementById('timerRingFill');
   if (s.timer && s.activeQuestion) {
     timerOv.classList.add('active');
     const rem = s.timer.remaining;
-    timerVal.textContent = rem + 's';
+    const dur = s.timer.duration;
     const urgent = rem <= 5 && rem > 0;
-    timerOv.classList.toggle('urgent', urgent);
-    timerVal.classList.toggle('urgent', urgent);
+    timerVal.textContent = rem + 's';
+    timerVal.className = 'timer-ring-value' + (urgent ? ' urgent' : '');
+    timerRingFill.className = 'timer-ring-fill' + (urgent ? ' urgent' : '');
+    // circumference = 2*pi*45 ≈ 283
+    const circumference = 283;
+    const offset = dur > 0 ? circumference * (1 - rem / dur) : circumference;
+    timerRingFill.style.strokeDashoffset = offset;
   } else {
     timerOv.classList.remove('active');
   }

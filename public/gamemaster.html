@@ -567,7 +567,6 @@
 
         <div id="revealRow" class="wait-row" style="display:none">
           <span>Frage noch verborgen</span>
-          <button class="btn btn-primary" style="margin-left:auto" onclick="revealQuestion()">Frage freigeben</button>
           <button class="btn btn-ghost" onclick="skipQuestion()">Überspringen</button>
         </div>
         <div id="buzzerBox" class="buzzer-box" style="display:none">
@@ -600,7 +599,7 @@
 
       <!-- Timer settings -->
       <div class="sidebar-card">
-        <div class="sidebar-card-title">Timer (für nächste Frage)</div>
+        <div class="sidebar-card-title">Timer (für diese Runde)</div>
         <div class="timer-settings">
           <div class="timer-presets">
             <button class="timer-preset-btn timer-off-btn" id="timerBtn0" onclick="setTimerPreset(0)">Aus</button>
@@ -753,7 +752,7 @@ function setTimerPreset(sec) {
   const activeEl = document.getElementById(activeId);
   if (activeEl) activeEl.classList.add('active');
   const statusEl = document.getElementById('timerSettingStatus');
-  statusEl.textContent = sec > 0 ? `${sec} Sekunden für die nächste Frage` : 'Timer deaktiviert';
+  statusEl.textContent = sec > 0 ? `${sec} Sekunden pro Runde` : 'Timer deaktiviert';
   socket.emit('gm:set_timer', { duration: sec });
 }
 

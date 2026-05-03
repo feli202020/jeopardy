@@ -444,7 +444,7 @@ function addCategory() {
 
 
 function defaultQuestions() {
-  return [200, 400, 600, 800, 1000].map(v => ({ value: v, question: '', answer: '', isDailyDouble: false, mediaType: null, mediaUrl: null }));
+  return [200, 400, 600, 800, 1000].map(v => ({ value: v, question: '', answer: '', hint: '', isDailyDouble: false, mediaType: null, mediaUrl: null }));
 }
 
 
@@ -481,7 +481,7 @@ function applyPreset(values) {
   const cat = quiz.categories[activeCatIdx];
   cat.questions = values.map(v => {
     const ex = cat.questions.find(q => q.value === v);
-    return ex || { value: v, question: '', answer: '', isDailyDouble: false, mediaType: null, mediaUrl: null };
+    return ex || { value: v, question: '', answer: '', hint: '', isDailyDouble: false, mediaType: null, mediaUrl: null };
   });
   renderCatEditor(activeCatIdx);
   toast('Preset angewendet', 'ok');
@@ -544,6 +544,11 @@ function buildQCard(ci, qi, q) {
                   oninput="updateQ(${ci},${qi},'answer',this.value)">${esc(q.answer||'')}</textarea>
       </div>
       <div class="field">
+        <div class="field-label" style="color:#a5b4fc">💡 Hinweis (optional — GM kann freischalten)</div>
+        <textarea placeholder="Hinweis eingeben… (z.B. Kategorie-Info, erster Buchstabe, …)" style="min-height:52px;border-color:rgba(99,102,241,.3)"
+                  oninput="updateQ(${ci},${qi},'hint',this.value)">${esc(q.hint||'')}</textarea>
+      </div>
+      <div class="field">
         <div class="field-label">Media (optional — Bild, Video oder Audio)</div>
         <div class="media-section">
           <div class="media-input-row">
@@ -597,7 +602,7 @@ function updateQ(ci, qi, field, val) {
 
 function addQuestion(ci) {
   const val = parseInt(document.getElementById('newQPts')?.value) || 200;
-  quiz.categories[ci].questions.push({ value: val, question: '', answer: '', isDailyDouble: false, mediaType: null, mediaUrl: null });
+  quiz.categories[ci].questions.push({ value: val, question: '', answer: '', hint: '', isDailyDouble: false, mediaType: null, mediaUrl: null });
   renderQuestions(ci);
 }
 

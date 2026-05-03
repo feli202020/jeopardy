@@ -203,6 +203,53 @@
     50%      { height: 66px; opacity: 1; }
   }
 
+  /* ── TIMER OVERLAY ── */
+  #timerOverlay {
+    position: fixed;
+    top: 60px; right: 24px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 22px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    z-index: 60;
+    min-width: 90px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.5);
+  }
+  #timerOverlay.active { display: flex; }
+  #timerOverlay.urgent { border-color: var(--red); box-shadow: 0 0 30px rgba(248,113,113,.3); }
+  .timer-overlay-label { font-size: .65rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); font-weight: 700; }
+  .timer-overlay-value {
+    font-family: 'Oswald', sans-serif;
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .timer-overlay-value.urgent { color: var(--red); }
+
+  /* ── HINT BANNER ── */
+  #hintBanner {
+    position: fixed;
+    top: 60px; left: 24px;
+    background: var(--surface);
+    border: 2px solid rgba(99,102,241,.5);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 60;
+    max-width: 380px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.5);
+  }
+  #hintBanner.active { display: flex; }
+  .hint-banner-label { font-size: .65rem; text-transform: uppercase; letter-spacing: 2px; color: #a5b4fc; font-weight: 700; }
+  .hint-banner-text { font-size: 1rem; font-weight: 700; color: #c7d2fe; line-height: 1.4; }
+
   /* ── AUTOPLAY OVERLAY ── */
   #autoplayOverlay {
     position: fixed;
@@ -322,6 +369,16 @@
   </div>
 </div>
 
+<div id="timerOverlay">
+  <div class="timer-overlay-label">Zeit</div>
+  <div class="timer-overlay-value" id="timerOverlayValue">--</div>
+</div>
+
+<div id="hintBanner">
+  <div class="hint-banner-label">💡 Hinweis</div>
+  <div class="hint-banner-text" id="hintBannerText"></div>
+</div>
+
 <div id="buzzerBanner">
   <div class="buzzer-flash"></div>
   <div>
@@ -429,6 +486,30 @@ function render(s) {
     banner.classList.add('active');
   } else {
     banner.classList.remove('active');
+  }
+
+  // Timer overlay
+  const timerOv = document.getElementById('timerOverlay');
+  const timerVal = document.getElementById('timerOverlayValue');
+  if (s.timer && s.activeQuestion) {
+    timerOv.classList.add('active');
+    const rem = s.timer.remaining;
+    timerVal.textContent = rem + 's';
+    const urgent = rem <= 5 && rem > 0;
+    timerOv.classList.toggle('urgent', urgent);
+    timerVal.classList.toggle('urgent', urgent);
+  } else {
+    timerOv.classList.remove('active');
+  }
+
+  // Hint banner
+  const hintBanner = document.getElementById('hintBanner');
+  const hintText = document.getElementById('hintBannerText');
+  if (s.hintRevealed && s.activeQuestion?.hint) {
+    hintBanner.classList.add('active');
+    hintText.textContent = s.activeQuestion.hint;
+  } else {
+    hintBanner.classList.remove('active');
   }
 }
 

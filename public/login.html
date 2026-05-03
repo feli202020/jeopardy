@@ -15,7 +15,9 @@
     --gold: #f5c842;
     --gold-light: #fde68a;
     --gold-glow: rgba(245,200,66,.18);
+    --blue-light: #a5b4fc;
     --red: #f87171;
+    --green: #34d399;
     --text: #f0eeff;
     --text-muted: #7c7a96;
     --radius: 14px;
@@ -34,168 +36,177 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  .login-wrap {
+  .wrap {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 32px;
+    gap: 28px;
     padding: 20px;
     width: 100%;
   }
 
-  .logo {
-    font-family: 'Oswald', sans-serif;
-    font-size: 3.5rem;
-    font-weight: 700;
-    letter-spacing: 8px;
-    color: var(--gold);
-    text-shadow: 0 0 60px var(--gold-glow);
-    text-align: center;
-  }
-  .logo-sub {
-    text-align: center;
-    color: var(--text-muted);
-    font-size: .85rem;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-top: 6px;
-  }
+  .logo { font-family: 'Oswald', sans-serif; font-size: 3.5rem; font-weight: 700; letter-spacing: 8px; color: var(--gold); text-shadow: 0 0 60px var(--gold-glow); text-align: center; }
+  .logo-sub { text-align: center; color: var(--text-muted); font-size: .85rem; letter-spacing: 3px; text-transform: uppercase; margin-top: 6px; }
 
-  .login-card {
+  .card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 36px 32px;
+    padding: 32px;
     width: 100%;
     max-width: 400px;
     box-shadow: 0 4px 40px rgba(0,0,0,.5);
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 18px;
   }
 
-  .card-title {
-    font-size: .75rem;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: var(--text-muted);
-    font-weight: 700;
-    text-align: center;
-  }
+  .divider { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: .75rem; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-  .field { display: flex; flex-direction: column; gap: 8px; }
-  .field-label {
-    font-size: .75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--text-muted);
-  }
-  input[type=password] {
+  .field { display: flex; flex-direction: column; gap: 7px; }
+  .field-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+  .field-hint { font-size: .72rem; color: var(--text-muted); }
+
+  input[type=text], input[type=password] {
     background: var(--surface2);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
     padding: 13px 16px;
     color: var(--text);
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-family: inherit;
-    letter-spacing: 4px;
     outline: none;
     transition: border-color .2s;
     width: 100%;
   }
-  input[type=password]:focus { border-color: var(--gold); }
+  input:focus { border-color: var(--gold); }
 
-  .btn-login {
+  .btn {
     width: 100%;
-    padding: 14px;
+    padding: 13px;
     border-radius: var(--radius-sm);
     border: none;
-    background: var(--gold);
-    color: #0f0e17;
     font-size: 1rem;
     font-weight: 800;
     font-family: inherit;
     cursor: pointer;
     transition: all .15s;
-    box-shadow: 0 2px 16px rgba(245,200,66,.3);
   }
-  .btn-login:hover:not(:disabled) {
-    background: var(--gold-light);
-    box-shadow: 0 4px 24px rgba(245,200,66,.45);
-    transform: translateY(-1px);
-  }
-  .btn-login:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-gold { background: var(--gold); color: #0f0e17; box-shadow: 0 2px 16px rgba(245,200,66,.3); }
+  .btn-gold:hover:not(:disabled) { background: var(--gold-light); transform: translateY(-1px); box-shadow: 0 4px 24px rgba(245,200,66,.45); }
+  .btn-blue { background: rgba(99,102,241,.1); color: var(--blue-light); border: 1.5px solid rgba(99,102,241,.4); }
+  .btn-blue:hover:not(:disabled) { background: rgba(99,102,241,.2); border-color: var(--blue-light); transform: translateY(-1px); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
-  .error-msg {
-    color: var(--red);
-    font-size: .85rem;
-    text-align: center;
-    min-height: 18px;
-  }
+  .error-msg { color: var(--red); font-size: .85rem; text-align: center; min-height: 18px; }
+  .success-msg { color: var(--green); font-size: .85rem; text-align: center; min-height: 18px; }
 
-  .back-link {
-    text-align: center;
-    font-size: .85rem;
-    color: var(--text-muted);
-  }
+  .back-link { text-align: center; font-size: .85rem; color: var(--text-muted); }
   .back-link a { color: var(--gold); text-decoration: none; }
   .back-link a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
-<div class="login-wrap">
+<div class="wrap">
   <div>
     <div class="logo">JEOPARDY</div>
     <div class="logo-sub">Gamemaster Login</div>
   </div>
 
-  <div class="login-card">
-    <div class="card-title">Nur für Gamemaster</div>
+  <div class="card">
+    <div class="field">
+      <div class="field-label">Benutzername</div>
+      <input type="text" id="userInput" placeholder="z.B. felix42" maxlength="16" autocomplete="username" autofocus>
+      <div class="field-hint">4–16 Zeichen · Buchstaben, Zahlen, _ oder -</div>
+    </div>
     <div class="field">
       <div class="field-label">Passwort</div>
-      <input type="password" id="pwInput" placeholder="••••••" autocomplete="current-password" autofocus>
+      <input type="password" id="pwInput" placeholder="••••" maxlength="16" autocomplete="current-password">
+      <div class="field-hint">4–16 Zeichen</div>
     </div>
-    <div id="errorMsg" class="error-msg"></div>
-    <button class="btn-login" id="loginBtn" onclick="doLogin()">Einloggen →</button>
+
+    <div id="errMsg" class="error-msg"></div>
+    <div id="sucMsg" class="success-msg"></div>
+
+    <button class="btn btn-gold" id="btnLogin" onclick="doLogin()">Anmelden →</button>
+    <div class="divider">noch kein Konto?</div>
+    <button class="btn btn-blue" id="btnRegister" onclick="doRegister()">Konto erstellen</button>
   </div>
 
   <div class="back-link"><a href="/">← Zurück zur Startseite</a></div>
 </div>
 
 <script>
-document.getElementById('pwInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
-});
+function setBtn(id, disabled, text) {
+  const b = document.getElementById(id);
+  b.disabled = disabled;
+  b.textContent = text;
+}
 
 async function doLogin() {
-  const pw = document.getElementById('pwInput').value;
-  const btn = document.getElementById('loginBtn');
-  const err = document.getElementById('errorMsg');
-  err.textContent = '';
-  btn.disabled = true;
-  btn.textContent = '…';
+  const username = document.getElementById('userInput').value.trim();
+  const password = document.getElementById('pwInput').value;
+  document.getElementById('errMsg').textContent = '';
+  document.getElementById('sucMsg').textContent = '';
+  if (!username || !password) return document.getElementById('errMsg').textContent = 'Bitte alle Felder ausfüllen.';
 
+  setBtn('btnLogin', true, '…');
+  setBtn('btnRegister', true, '…');
   try {
-    const res = await fetch('/api/login', {
+    const res = await fetch('/api/auth/user-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw })
+      body: JSON.stringify({ username, password })
     });
     const data = await res.json();
     if (data.ok) {
-      window.location.href = '/gamemaster.html';
+      document.getElementById('sucMsg').textContent = 'Willkommen, ' + data.username + '!';
+      setTimeout(() => { window.location.href = '/gamemaster.html'; }, 500);
     } else {
-      err.textContent = data.error || 'Falsches Passwort';
-      btn.disabled = false;
-      btn.textContent = 'Einloggen →';
+      document.getElementById('errMsg').textContent = data.error || 'Anmeldung fehlgeschlagen';
+      setBtn('btnLogin', false, 'Anmelden →');
+      setBtn('btnRegister', false, 'Konto erstellen');
     }
   } catch {
-    err.textContent = 'Verbindungsfehler';
-    btn.disabled = false;
-    btn.textContent = 'Einloggen →';
+    document.getElementById('errMsg').textContent = 'Verbindungsfehler';
+    setBtn('btnLogin', false, 'Anmelden →');
+    setBtn('btnRegister', false, 'Konto erstellen');
   }
 }
+
+async function doRegister() {
+  const username = document.getElementById('userInput').value.trim();
+  const password = document.getElementById('pwInput').value;
+  document.getElementById('errMsg').textContent = '';
+  document.getElementById('sucMsg').textContent = '';
+  if (!username || !password) return document.getElementById('errMsg').textContent = 'Bitte alle Felder ausfüllen.';
+
+  setBtn('btnLogin', true, '…');
+  setBtn('btnRegister', true, '…');
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('sucMsg').textContent = 'Konto erstellt! Melde dich jetzt an.';
+      document.getElementById('pwInput').value = '';
+    } else {
+      document.getElementById('errMsg').textContent = data.error || 'Registrierung fehlgeschlagen';
+    }
+  } catch {
+    document.getElementById('errMsg').textContent = 'Verbindungsfehler';
+  }
+  setBtn('btnLogin', false, 'Anmelden →');
+  setBtn('btnRegister', false, 'Konto erstellen');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
 </script>
 </body>
 </html>

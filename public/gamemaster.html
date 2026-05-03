@@ -17,6 +17,7 @@
     --gold-glow: rgba(245,200,66,.15);
     --green: #34d399;
     --red: #f87171;
+    --blue: #6366f1;
     --text: #f0eeff;
     --text-muted: #7c7a96;
     --text-dim: #3a3858;
@@ -55,6 +56,7 @@
     line-height: 1;
   }
   .topbar-badge span { color: var(--gold); font-family: 'Oswald', sans-serif; font-size: .95rem; letter-spacing: 2px; line-height: 1; }
+  .topbar-user { font-size: .78rem; color: var(--text-muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
   .topbar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
   .topbar-link {
     padding: 6px 14px;
@@ -69,6 +71,8 @@
     align-items: center;
     gap: 5px;
     transition: all .15s;
+    cursor: pointer;
+    font-family: inherit;
   }
   .topbar-link:hover { border-color: var(--gold); color: var(--gold); }
   .topbar-link.display { border-color: rgba(99,102,241,.4); color: #a5b4fc; }
@@ -159,7 +163,7 @@
   /* ── GAME LAYOUT ── */
   #pageGame { overflow: hidden; display: none; }
   #pageGame.active { display: flex; flex-direction: column; }
-  .game-grid { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; flex: 1; min-height: 0; }
+  .game-grid { display: grid; grid-template-columns: 1fr 290px; gap: 16px; align-items: start; flex: 1; min-height: 0; }
   @media (max-width: 900px) { .game-grid { grid-template-columns: 1fr; } }
 
   /* ── BOARD ── */
@@ -199,15 +203,19 @@
     align-items: center;
     justify-content: center;
     position: relative;
+    flex-direction: column;
+    gap: 2px;
   }
-  .board-cell:hover:not(.answered):not(.disabled) {
+  .board-cell:hover:not(.disabled) {
     border-color: var(--gold);
     background: #1e1c30;
     transform: scale(1.04);
     box-shadow: 0 4px 20px var(--gold-glow);
   }
-  .board-cell.answered { background: var(--surface2); color: var(--text-dim); border-color: var(--surface2); cursor: default; }
+  .board-cell.answered { background: var(--surface2); color: var(--text-dim); border-color: var(--surface2); cursor: pointer; }
+  .board-cell.answered:hover { border-color: rgba(245,200,66,.3); background: #1e1c30; color: var(--gold); opacity: .7; }
   .board-cell.disabled { opacity: .4; cursor: not-allowed; }
+  .board-cell .repeat-hint { font-size: .5rem; color: var(--text-muted); font-family: 'Inter', sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
   .board-cell.dd-marker::after {
     content: '★';
     position: absolute;
@@ -251,6 +259,55 @@
   .q-media img { max-width: 100%; max-height: 260px; border-radius: var(--radius-sm); }
   .q-media video { max-width: 100%; border-radius: var(--radius-sm); }
 
+  /* ── HINT BOX ── */
+  .hint-box {
+    background: rgba(99,102,241,.08);
+    border: 1.5px solid rgba(99,102,241,.3);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    margin-bottom: 10px;
+  }
+  .hint-label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: #a5b4fc; font-weight: 700; margin-bottom: 4px; }
+  .hint-text { font-weight: 600; color: #c7d2fe; font-size: .95rem; }
+  .hint-reveal-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+
+  /* ── TIMER ── */
+  .timer-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin-bottom: 10px;
+  }
+  .timer-display.urgent { border-color: var(--red); background: rgba(248,113,113,.07); }
+  .timer-clock {
+    font-family: 'Oswald', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gold);
+    min-width: 52px;
+    line-height: 1;
+  }
+  .timer-clock.urgent { color: var(--red); }
+  .timer-ctrl-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mc-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .9rem;
+    transition: all .15s;
+    flex-shrink: 0;
+  }
+  .mc-play  { background: var(--gold); color: #0f0e17; }
+  .mc-play:hover  { background: var(--gold-light); transform: scale(1.08); }
+  .mc-stop  { background: var(--surface); border: 1.5px solid var(--border); color: var(--text-muted); }
+  .mc-stop:hover  { border-color: var(--red); color: var(--red); }
+
   /* ── MEDIA CONTROLS ── */
   .media-ctrl {
     background: var(--surface2);
@@ -263,20 +320,6 @@
     margin-bottom: 4px;
   }
   .media-ctrl-row { display: flex; align-items: center; gap: 10px; }
-  .mc-btn {
-    width: 38px; height: 38px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem;
-    transition: all .15s;
-    flex-shrink: 0;
-  }
-  .mc-play  { background: var(--gold); color: #0f0e17; }
-  .mc-play:hover  { background: var(--gold-light); transform: scale(1.08); }
-  .mc-stop  { background: var(--surface); border: 1.5px solid var(--border); color: var(--text-muted); }
-  .mc-stop:hover  { border-color: var(--red); color: var(--red); }
   .mc-progress { flex: 1; display: flex; flex-direction: column; gap: 4px; }
   .mc-bar-wrap {
     height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; cursor: pointer;
@@ -284,7 +327,6 @@
   .mc-bar-fill { height: 100%; background: var(--gold); border-radius: 99px; width: 0%; transition: width .3s linear; }
   .mc-time { font-size: .72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-  /* Soundbar-Visualisierung */
   .soundbar {
     display: flex;
     align-items: flex-end;
@@ -313,7 +355,7 @@
     border: 1.5px solid rgba(52,211,153,.25);
     border-radius: var(--radius-sm);
     padding: 14px 18px;
-    margin-bottom: 18px;
+    margin-bottom: 10px;
     font-size: 1rem;
   }
   .answer-label { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--green); font-weight: 700; margin-bottom: 4px; }
@@ -343,16 +385,52 @@
     padding: 18px;
   }
   .sidebar-card-title { font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 700; margin-bottom: 14px; }
-  .score-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .score-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .score-row:last-child { border-bottom: none; }
   .score-rank { width: 20px; font-size: .8rem; color: var(--text-muted); font-weight: 700; }
   .score-name { flex: 1; font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .score-pts { font-family: 'Oswald', sans-serif; font-size: 1.2rem; font-weight: 600; color: var(--gold); }
+  .score-pts { font-family: 'Oswald', sans-serif; font-size: 1.2rem; font-weight: 600; color: var(--gold); cursor: pointer; border-radius: 4px; padding: 1px 4px; transition: background .15s; }
+  .score-pts:hover { background: var(--surface2); }
   .score-pts.neg { color: var(--red); }
+  .score-edit-input {
+    background: var(--surface2);
+    border: 1.5px solid var(--gold);
+    border-radius: 6px;
+    color: var(--gold);
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    width: 80px;
+    text-align: center;
+    outline: none;
+    padding: 2px 6px;
+  }
   .progress-bar-wrap { margin-top: 8px; }
   .progress-label { font-size: .75rem; color: var(--text-muted); margin-bottom: 6px; }
   .progress-bar-bg { height: 6px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
   .progress-bar-fill { height: 100%; background: var(--gold); border-radius: 99px; transition: width .4s; }
+
+  /* ── TIMER SETTINGS ── */
+  .timer-settings { display: flex; flex-direction: column; gap: 10px; }
+  .timer-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .timer-preset-btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    font-size: .8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s;
+    color: var(--text-muted);
+    font-family: inherit;
+  }
+  .timer-preset-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .timer-preset-btn.active { background: rgba(245,200,66,.12); border-color: var(--gold); color: var(--gold); }
+  .timer-off-btn { border-color: rgba(248,113,113,.3); color: var(--red); }
+  .timer-off-btn:hover { background: rgba(248,113,113,.1); border-color: var(--red); }
+  .timer-off-btn.active { background: rgba(248,113,113,.12); border-color: var(--red); }
+  .timer-status { font-size: .75rem; color: var(--text-muted); }
 
   /* ── END ── */
   .end-page { max-width: 600px; margin: 40px auto; text-align: center; }
@@ -390,7 +468,6 @@
   .final-score { font-family: 'Oswald', sans-serif; font-size: 1.3rem; color: var(--gold); }
   .final-score.neg { color: var(--red); }
 
-
   /* ── TOAST ── */
   #toast {
     position: fixed;
@@ -416,6 +493,7 @@
 <div class="topbar">
   <div class="topbar-logo">JEOPARDY</div>
   <div class="topbar-badge" id="topbarBadge" style="display:none">Code: <span id="topbarCode">---</span></div>
+  <div class="topbar-user" id="topbarUser" style="display:none"></div>
   <div class="topbar-right" id="topbarRight">
     <a id="linkDisplay" href="/display.html" target="_blank" class="topbar-link display">⬛ Display</a>
     <button class="topbar-link" onclick="logout()" style="cursor:pointer;font-family:inherit">🚪 Logout</button>
@@ -459,14 +537,38 @@
         </div>
         <div class="q-text" id="gmQText"></div>
         <div class="q-media" id="gmQMedia"></div>
+
+        <!-- Hint reveal row -->
+        <div id="hintRevealRow" style="display:none" class="hint-reveal-row">
+          <button class="btn btn-ghost" style="font-size:.8rem;padding:6px 12px" onclick="revealHint()">💡 Hinweis freischalten</button>
+        </div>
+        <!-- Hint display -->
+        <div class="hint-box" id="gmHintBox" style="display:none">
+          <div class="hint-label">💡 Hinweis</div>
+          <div class="hint-text" id="gmHintText"></div>
+        </div>
+
         <div class="answer-box" id="gmAnswerBox" style="display:none">
           <div class="answer-label">Antwort</div>
           <div class="answer-text" id="gmAnswerText"></div>
         </div>
+
+        <!-- Timer for active question -->
+        <div id="timerActiveRow" style="display:none" class="timer-display">
+          <div class="timer-clock" id="timerClock">--</div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+            <div style="font-size:.75rem;color:var(--text-muted)">Countdown</div>
+            <div class="timer-ctrl-row">
+              <button class="mc-btn mc-play" id="timerPlayBtn" onclick="toggleTimer()">▶</button>
+              <button class="mc-btn mc-stop" onclick="resetTimer()" title="Zurücksetzen">↺</button>
+            </div>
+          </div>
+        </div>
+
         <div id="revealRow" class="wait-row" style="display:none">
           <span>Frage noch verborgen</span>
           <button class="btn btn-primary" style="margin-left:auto" onclick="revealQuestion()">Frage freigeben</button>
-          <button class="btn btn-ghost" onclick="skipQuestion()">Frage überspringen</button>
+          <button class="btn btn-ghost" onclick="skipQuestion()">Überspringen</button>
         </div>
         <div id="buzzerBox" class="buzzer-box" style="display:none">
           <div class="buzzer-box-label">Erster Buzzer</div>
@@ -487,14 +589,31 @@
           <button class="btn btn-ghost" style="margin-left:auto" onclick="skipQuestion()">Frage überspringen</button>
         </div>
       </div>
-
-
     </div>
+
     <div class="sidebar">
+      <!-- Scoreboard with editable scores -->
       <div class="sidebar-card">
-        <div class="sidebar-card-title">Scoreboard</div>
+        <div class="sidebar-card-title">Scoreboard <span style="font-size:.68rem;color:var(--text-muted);font-weight:400;text-transform:none">(Punkte klicken zum Bearbeiten)</span></div>
         <div id="gmScoreboard"></div>
       </div>
+
+      <!-- Timer settings -->
+      <div class="sidebar-card">
+        <div class="sidebar-card-title">Timer (für nächste Frage)</div>
+        <div class="timer-settings">
+          <div class="timer-presets">
+            <button class="timer-preset-btn timer-off-btn" id="timerBtn0" onclick="setTimerPreset(0)">Aus</button>
+            <button class="timer-preset-btn" id="timerBtn5" onclick="setTimerPreset(5)">5s</button>
+            <button class="timer-preset-btn" id="timerBtn10" onclick="setTimerPreset(10)">10s</button>
+            <button class="timer-preset-btn" id="timerBtn15" onclick="setTimerPreset(15)">15s</button>
+            <button class="timer-preset-btn" id="timerBtn30" onclick="setTimerPreset(30)">30s</button>
+          </div>
+          <div class="timer-status" id="timerSettingStatus">Timer deaktiviert</div>
+        </div>
+      </div>
+
+      <!-- Progress + end game -->
       <div class="sidebar-card">
         <div class="sidebar-card-title">Fortschritt</div>
         <div class="progress-bar-wrap">
@@ -522,7 +641,22 @@
 <script>
 const socket = io();
 let state = null;
+let timerRunning = false;
+let selectedTimerDuration = 0; // 0 = off
+let editingScoreId = null;
 
+// ── USER INFO ────────────────────────────────────────────────────────────────
+async function loadUserInfo() {
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    const el = document.getElementById('topbarUser');
+    if (data.loggedIn && data.username) {
+      el.textContent = '👤 ' + data.username;
+      el.style.display = 'block';
+    }
+  } catch {}
+}
 
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -602,9 +736,77 @@ function revealQuestion() {
   socket.emit('gm:reveal_question');
 }
 
+function revealHint() {
+  socket.emit('gm:reveal_hint');
+}
+
 function endGame() {
   if (!confirm('Spiel wirklich beenden?')) return;
   socket.emit('gm:end_game');
+}
+
+// ── TIMER SETTINGS ────────────────────────────────────────────────────────────
+function setTimerPreset(sec) {
+  selectedTimerDuration = sec;
+  document.querySelectorAll('.timer-preset-btn').forEach(b => b.classList.remove('active'));
+  const activeId = sec === 0 ? 'timerBtn0' : `timerBtn${sec}`;
+  const activeEl = document.getElementById(activeId);
+  if (activeEl) activeEl.classList.add('active');
+  const statusEl = document.getElementById('timerSettingStatus');
+  statusEl.textContent = sec > 0 ? `${sec} Sekunden für die nächste Frage` : 'Timer deaktiviert';
+  socket.emit('gm:set_timer', { duration: sec });
+}
+
+function toggleTimer() {
+  if (timerRunning) {
+    socket.emit('gm:stop_timer');
+  } else {
+    socket.emit('gm:start_timer');
+  }
+}
+
+function resetTimer() {
+  socket.emit('gm:reset_timer');
+}
+
+socket.on('timer:timeout', () => {
+  toast('Zeit abgelaufen!', 'err', 3000);
+});
+
+// ── SCORE EDITING ─────────────────────────────────────────────────────────────
+function startScoreEdit(socketId, currentScore) {
+  if (editingScoreId) commitScoreEdit();
+  editingScoreId = socketId;
+  const el = document.getElementById(`score-${socketId}`);
+  if (!el) return;
+  const input = document.createElement('input');
+  input.className = 'score-edit-input';
+  input.type = 'number';
+  input.value = currentScore;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') commitScoreEdit();
+    if (e.key === 'Escape') { editingScoreId = null; renderScoreboard(state); }
+  };
+  input.onblur = () => commitScoreEdit();
+  el.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function commitScoreEdit() {
+  if (!editingScoreId) return;
+  const input = document.querySelector('.score-edit-input');
+  if (!input) { editingScoreId = null; return; }
+  const val = parseInt(input.value);
+  const id = editingScoreId;
+  editingScoreId = null;
+  if (!isNaN(val)) {
+    socket.emit('gm:set_score', { socketId: id, score: val }, (res) => {
+      if (res?.error) toast(res.error, 'err');
+    });
+  } else {
+    renderScoreboard(state);
+  }
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -650,9 +852,16 @@ function renderBoard(s) {
     col.appendChild(hdr);
     cat.questions.forEach((q, qi) => {
       const cell = document.createElement('div');
-      const canClick = !q.answered && s.phase === 'board';
-      cell.className = 'board-cell' + (q.answered ? ' answered' : '') + (q.isDailyDouble ? ' dd-marker' : '') + (canClick ? '' : ' disabled');
-      cell.textContent = q.answered ? '' : `$${q.value}`;
+      const canClick = s.phase === 'board';
+      cell.className = 'board-cell'
+        + (q.answered ? ' answered' : '')
+        + (q.isDailyDouble ? ' dd-marker' : '')
+        + (canClick ? '' : ' disabled');
+      if (q.answered) {
+        cell.innerHTML = `<span style="color:var(--text-dim);font-size:.75rem;font-family:Inter,sans-serif">$${q.value}</span><span class="repeat-hint">wiederholen</span>`;
+      } else {
+        cell.textContent = `$${q.value}`;
+      }
       if (canClick) cell.onclick = () => selectQuestion(ci, qi);
       col.appendChild(cell);
     });
@@ -668,7 +877,8 @@ function renderScoreboard(s) {
       <span class="score-name" style="${p.online===false?'opacity:.45;text-decoration:line-through':''}">
         ${esc(p.name)}${p.online===false?' 📴':''}
       </span>
-      <span class="score-pts ${p.score<0?'neg':''}">$${p.score}</span>
+      <span class="score-pts ${p.score<0?'neg':''}" id="score-${p.socketId}"
+            onclick="startScoreEdit('${p.socketId}', ${p.score})">$${p.score}</span>
     </div>`).join('');
 }
 
@@ -689,6 +899,8 @@ function renderQuestion(s) {
   document.getElementById('gmQValue').textContent = q.isDailyDouble ? `★ $${q.value} (×2)` : `$${q.value}`;
   document.getElementById('gmDdBadge').style.display = q.isDailyDouble ? 'inline-flex' : 'none';
   document.getElementById('gmQText').textContent = q.question || '';
+
+  // Answer box
   const answerBox = document.getElementById('gmAnswerBox');
   const answerText = document.getElementById('gmAnswerText');
   if (q.answer) {
@@ -697,6 +909,26 @@ function renderQuestion(s) {
   } else {
     answerBox.style.display = 'none';
   }
+
+  // Hint
+  const hintBox = document.getElementById('gmHintBox');
+  const hintText = document.getElementById('gmHintText');
+  const hintRevealRow = document.getElementById('hintRevealRow');
+  if (q.hint) {
+    if (s.hintRevealed) {
+      hintBox.style.display = 'block';
+      hintText.textContent = q.hint;
+      hintRevealRow.style.display = 'none';
+    } else {
+      hintBox.style.display = 'none';
+      hintRevealRow.style.display = 'flex';
+    }
+  } else {
+    hintBox.style.display = 'none';
+    hintRevealRow.style.display = 'none';
+  }
+
+  // Media
   const media = document.getElementById('gmQMedia');
   const prevUrl = media.dataset.url;
   if (q.mediaUrl !== prevUrl) {
@@ -726,21 +958,36 @@ function renderQuestion(s) {
     }
   }
 
+  // Timer display
+  const timerRow = document.getElementById('timerActiveRow');
+  const timerClock = document.getElementById('timerClock');
+  const timerPlayBtn = document.getElementById('timerPlayBtn');
+  if (s.timer) {
+    timerRow.style.display = 'flex';
+    const rem = s.timer.remaining;
+    timerClock.textContent = rem + 's';
+    timerRunning = s.timer.running;
+    timerPlayBtn.textContent = s.timer.running ? '⏸' : '▶';
+    timerRow.className = 'timer-display' + (rem <= 5 && rem > 0 ? ' urgent' : '');
+    timerClock.className = 'timer-clock' + (rem <= 5 && rem > 0 ? ' urgent' : '');
+  } else {
+    timerRow.style.display = 'none';
+    timerRunning = false;
+  }
+
+  // Phase-based rows
   const revealRow = document.getElementById('revealRow');
   const buzzerBox = document.getElementById('buzzerBox');
   const judgeRow = document.getElementById('judgeRow');
   const waitRow = document.getElementById('waitRow');
   const closedRow = document.getElementById('closedRow');
 
-  const hideAll = () => {
-    revealRow.style.display = 'none';
-    buzzerBox.style.display = 'none';
-    judgeRow.style.display = 'none';
-    waitRow.style.display = 'none';
-    closedRow.style.display = 'none';
-  };
+  revealRow.style.display = 'none';
+  buzzerBox.style.display = 'none';
+  judgeRow.style.display = 'none';
+  waitRow.style.display = 'none';
+  closedRow.style.display = 'none';
 
-  hideAll();
   if (s.phase === 'buzzed' && s.buzzer) {
     buzzerBox.style.display = 'block';
     document.getElementById('gmBuzzerName').textContent = s.buzzer;
@@ -776,9 +1023,7 @@ function renderEnd(s) {
 let _mediaEl = null;
 let _mediaTimer = null;
 
-function getMedia() {
-  return document.getElementById('gmMediaEl');
-}
+function getMedia() { return document.getElementById('gmMediaEl'); }
 
 function setupMediaSync(id) {
   _mediaEl = null;
@@ -787,9 +1032,7 @@ function setupMediaSync(id) {
   if (!el) return;
   _mediaEl = el;
   el.addEventListener('timeupdate', updateMediaBar);
-  el.addEventListener('ended', () => {
-    document.getElementById('mcPlayBtn').textContent = '▶';
-  });
+  el.addEventListener('ended', () => { document.getElementById('mcPlayBtn').textContent = '▶'; });
 }
 
 function updateMediaBar() {
@@ -846,7 +1089,11 @@ async function logout() {
   window.location.href = '/login.html';
 }
 
+// Init
+loadUserInfo();
 loadQuizList();
+// Default timer preset: off
+document.getElementById('timerBtn0').classList.add('active');
 </script>
 </body>
 </html>

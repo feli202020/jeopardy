@@ -6,9 +6,10 @@ const multer = require('multer');
 const session = require('express-session');
 const { createClient } = require('@supabase/supabase-js');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
 
 const app = express();
-app.set('trust proxy', 1); // Render / andere Reverse-Proxies
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 50e6 });
 
@@ -28,7 +29,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 Tage
+    maxAge: 1000 * 60 * 60 * 24 * 7,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
   }
@@ -36,15 +37,13 @@ app.use(session({
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
-const GAMEMASTER_PASSWORD = process.env.GAMEMASTER_PASSWORD || '135790';
-
 function requireGM(req, res, next) {
-  if (req.session && req.session.isGamemaster) return next();
+  if (req.session && req.session.userId) return next();
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Nicht angemeldet' });
   res.redirect('/login.html');
 }
 
-// Geschützte Seiten vor static middleware registrieren
+// Geschützte Seiten
 app.get('/gamemaster.html', requireGM, (req, res) => {
   res.sendFile('gamemaster.html', { root: __dirname + '/public' });
 });
@@ -52,19 +51,9 @@ app.get('/editor.html', requireGM, (req, res) => {
   res.sendFile('editor.html', { root: __dirname + '/public' });
 });
 
-// Öffentliche statische Dateien (index.html, display.html, login.html, …)
 app.use(express.static(__dirname + '/public'));
 
 // ─── AUTH ROUTES ─────────────────────────────────────────────────────────────
-
-app.post('/api/login', (req, res) => {
-  const { password } = req.body;
-  if (password === GAMEMASTER_PASSWORD) {
-    req.session.isGamemaster = true;
-    return res.json({ ok: true });
-  }
-  res.status(401).json({ error: 'Falsches Passwort' });
-});
 
 app.post('/api/logout', (req, res) => {
   req.session.destroy();
@@ -72,16 +61,68 @@ app.post('/api/logout', (req, res) => {
 });
 
 app.get('/api/auth/check', (req, res) => {
-  res.json({ ok: !!(req.session && req.session.isGamemaster) });
+  res.json({ ok: !!(req.session && req.session.userId) });
+});
+
+// ─── USER ACCOUNTS (username + password, eigene Tabelle) ─────────────────────
+
+const USERNAME_RE = /^[a-zA-Z0-9_\-]{4,16}$/;
+
+app.post('/api/auth/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
+  if (!USERNAME_RE.test(username)) return res.status(400).json({ error: 'Benutzername: 4–16 Zeichen, nur Buchstaben, Zahlen, _ oder -' });
+  if (password.length < 4 || password.length > 16) return res.status(400).json({ error: 'Passwort muss 4–16 Zeichen lang sein' });
+
+  // Check username taken
+  const { data: existing } = await supabase.from('users').select('id').ilike('username', username).maybeSingle();
+  if (existing) return res.status(409).json({ error: 'Benutzername bereits vergeben' });
+
+  const hash = await bcrypt.hash(password, 10);
+  const id = uuidv4();
+  const { error } = await supabase.from('users').insert({ id, username, password_hash: hash });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+app.post('/api/auth/user-login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
+
+  const { data: user } = await supabase.from('users').select('id, username, password_hash').ilike('username', username).maybeSingle();
+  if (!user) return res.status(401).json({ error: 'Falscher Benutzername oder Passwort' });
+
+  const ok = await bcrypt.compare(password, user.password_hash);
+  if (!ok) return res.status(401).json({ error: 'Falscher Benutzername oder Passwort' });
+
+  req.session.userId = user.id;
+  req.session.username = user.username;
+  res.json({ ok: true, username: user.username });
+});
+
+app.post('/api/auth/user-logout', (req, res) => {
+  req.session.destroy();
+  res.json({ ok: true });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  if (!req.session) return res.json({ loggedIn: false });
+  res.json({
+    loggedIn: !!req.session.userId,
+    userId: req.session.userId || null,
+    username: req.session.username || null,
+  });
 });
 
 // ─── QUIZ REST API ────────────────────────────────────────────────────────────
 
 app.get('/api/quizzes', requireGM, async (req, res) => {
-  const { data, error } = await supabase
-    .from('quizzes')
-    .select('id, title, categories')
-    .order('created_at', { ascending: false });
+  const userId = req.session.userId;
+  let query = supabase.from('quizzes').select('id, title, categories, user_id').order('created_at', { ascending: false });
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(q => ({
     id: q.id,
@@ -97,12 +138,21 @@ app.get('/api/quizzes/:id', requireGM, async (req, res) => {
     .eq('id', req.params.id)
     .single();
   if (error || !data) return res.status(404).json({ error: 'Not found' });
+  // Ownership check for user-accounts
+  if (req.session.userId && data.user_id && data.user_id !== req.session.userId) {
+    return res.status(403).json({ error: 'Kein Zugriff' });
+  }
   res.json(data);
 });
 
 app.post('/api/quizzes', requireGM, async (req, res) => {
   const id = uuidv4();
-  const quiz = { id, title: req.body.title || 'Neues Quiz', categories: req.body.categories || [] };
+  const quiz = {
+    id,
+    title: req.body.title || 'Neues Quiz',
+    categories: req.body.categories || [],
+    user_id: req.session.userId || null,
+  };
   const { data, error } = await supabase.from('quizzes').insert(quiz).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -110,6 +160,13 @@ app.post('/api/quizzes', requireGM, async (req, res) => {
 
 app.put('/api/quizzes/:id', requireGM, async (req, res) => {
   const { id } = req.params;
+  // Ownership check
+  if (req.session.userId) {
+    const { data: existing } = await supabase.from('quizzes').select('user_id').eq('id', id).single();
+    if (existing && existing.user_id && existing.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Kein Zugriff' });
+    }
+  }
   const update = { ...req.body, id };
   const { data, error } = await supabase
     .from('quizzes')
@@ -122,7 +179,14 @@ app.put('/api/quizzes/:id', requireGM, async (req, res) => {
 });
 
 app.delete('/api/quizzes/:id', requireGM, async (req, res) => {
-  const { error } = await supabase.from('quizzes').delete().eq('id', req.params.id);
+  const { id } = req.params;
+  if (req.session.userId) {
+    const { data: existing } = await supabase.from('quizzes').select('user_id').eq('id', id).single();
+    if (existing && existing.user_id && existing.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Kein Zugriff' });
+    }
+  }
+  const { error } = await supabase.from('quizzes').delete().eq('id', id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ ok: true });
 });
@@ -192,6 +256,13 @@ async function createRoom(quizId, gamemasterSocketId) {
     buzzer: null,
     buzzOrder: [],
     lockedOut: new Set(),
+    questionRevealed: false,
+    buzzerClosed: false,
+    // Timer state
+    timer: null,         // { duration: 30, remaining: 30, running: false }
+    timerInterval: null, // server-side interval handle
+    // Hint state
+    hintRevealed: false,
   };
   return rooms[code];
 }
@@ -224,13 +295,19 @@ function roomPublicState(room) {
       isDailyDouble: activeQ(room)?.isDailyDouble,
       mediaType: activeQ(room)?.mediaType,
       mediaUrl: activeQ(room)?.mediaUrl,
-      // Only reveal question text to players after GM releases it
       question: room.questionRevealed ? activeQ(room)?.question : null,
+      hint: room.hintRevealed ? (activeQ(room)?.hint || null) : null,
     } : null,
     questionRevealed: !!room.questionRevealed,
+    hintRevealed: !!room.hintRevealed,
     buzzerClosed: !!room.buzzerClosed,
     buzzer: room.buzzer ? room.players[room.buzzer]?.name : null,
     buzzOrder: room.buzzOrder.map(id => room.players[id]?.name).filter(Boolean),
+    timer: room.timer ? {
+      duration: room.timer.duration,
+      remaining: room.timer.remaining,
+      running: room.timer.running,
+    } : null,
   };
 }
 
@@ -243,11 +320,11 @@ function activeQ(room) {
 function gamemasterState(room) {
   const pub = roomPublicState(room);
   if (room.activeQuestion) {
-    // GM always sees the full question text and answer, regardless of reveal state
     pub.activeQuestion = {
       ...pub.activeQuestion,
       question: activeQ(room)?.question,
       answer: activeQ(room)?.answer,
+      hint: activeQ(room)?.hint || null,
     };
   }
   return pub;
@@ -256,6 +333,30 @@ function gamemasterState(room) {
 function broadcastRoom(room) {
   io.to(room.code).emit('room:update', roomPublicState(room));
   io.to(room.gamemasterId).emit('room:update', gamemasterState(room));
+}
+
+function clearRoomTimer(room) {
+  if (room.timerInterval) {
+    clearInterval(room.timerInterval);
+    room.timerInterval = null;
+  }
+}
+
+function startRoomTimer(room) {
+  clearRoomTimer(room);
+  if (!room.timer) return;
+  room.timer.running = true;
+  room.timerInterval = setInterval(() => {
+    if (!room.timer || !room.timer.running) { clearRoomTimer(room); return; }
+    room.timer.remaining = Math.max(0, room.timer.remaining - 1);
+    broadcastRoom(room);
+    if (room.timer.remaining <= 0) {
+      room.timer.running = false;
+      clearRoomTimer(room);
+      // Emit a dedicated timeout event so clients can react
+      io.to(room.code).emit('timer:timeout');
+    }
+  }, 1000);
 }
 
 // ─── SOCKET EVENTS ───────────────────────────────────────────────────────────
@@ -303,7 +404,6 @@ io.on('connection', (socket) => {
     cb({ ok: true, state: roomPublicState(room), playerId: socket.id });
   });
 
-  // Observer (Display-Screen) — nur zuschauen, kein Spieler
   socket.on('observer:join', ({ code }, cb) => {
     const room = rooms[code?.toUpperCase()];
     if (!room) return cb?.({ error: 'Raum nicht gefunden' });
@@ -325,7 +425,8 @@ io.on('connection', (socket) => {
     if (!room || room.gamemasterId !== socket.id) return;
     if (room.phase !== 'board') return;
     const q = room.board[categoryIdx]?.questions[questionIdx];
-    if (!q || q.answered) return;
+    if (!q) return;
+    // Allow re-selecting answered questions (repeat feature)
     room.activeQuestion = { categoryIdx, questionIdx };
     room.buzzer = null;
     room.buzzOrder = [];
@@ -333,6 +434,14 @@ io.on('connection', (socket) => {
     room.phase = 'question';
     room.questionRevealed = !!(q.mediaUrl);
     room.buzzerClosed = false;
+    room.hintRevealed = false;
+    // Reset timer if configured
+    if (room.pendingTimerDuration) {
+      room.timer = { duration: room.pendingTimerDuration, remaining: room.pendingTimerDuration, running: false };
+    } else {
+      room.timer = null;
+    }
+    clearRoomTimer(room);
     broadcastRoom(room);
     cb?.({ ok: true });
   });
@@ -346,17 +455,83 @@ io.on('connection', (socket) => {
     cb?.({ ok: true });
   });
 
+  socket.on('gm:reveal_hint', (_, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    if (!['question', 'buzzed'].includes(room.phase)) return;
+    room.hintRevealed = true;
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  // Timer: GM sets the default duration for next question (0 = off)
+  socket.on('gm:set_timer', ({ duration }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    room.pendingTimerDuration = duration > 0 ? duration : 0;
+    cb?.({ ok: true });
+  });
+
+  // Timer: GM starts the countdown for the active question
+  socket.on('gm:start_timer', (_, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    if (!room.timer) return cb?.({ error: 'Kein Timer konfiguriert' });
+    if (room.timer.running) return cb?.({ ok: true });
+    startRoomTimer(room);
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  socket.on('gm:stop_timer', (_, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    clearRoomTimer(room);
+    if (room.timer) room.timer.running = false;
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  socket.on('gm:reset_timer', (_, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    clearRoomTimer(room);
+    if (room.timer) {
+      room.timer.remaining = room.timer.duration;
+      room.timer.running = false;
+    }
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  // Manual score adjustment by GM
+  socket.on('gm:set_score', ({ socketId, score }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    const player = room.players[socketId];
+    if (!player) return cb?.({ error: 'Spieler nicht gefunden' });
+    const parsed = parseInt(score);
+    if (isNaN(parsed)) return cb?.({ error: 'Ungültiger Wert' });
+    player.score = parsed;
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
   socket.on('player:buzz', (_, cb) => {
     const room = getRoomBySocket(socket.id);
     if (!room || !room.players[socket.id]) return;
     if (room.phase !== 'question') return;
-    if (!room.questionRevealed) return cb?.({ error: 'Frage noch nicht freigegeben' });
     if (room.lockedOut.size >= 3) return cb?.({ error: 'Maximale Buzzer-Versuche erreicht' });
     if (room.lockedOut.has(socket.id)) return cb?.({ error: 'Du bist gesperrt' });
     if (!room.buzzOrder.includes(socket.id)) room.buzzOrder.push(socket.id);
     if (!room.buzzer) {
       room.buzzer = socket.id;
       room.phase = 'buzzed';
+      // Pause timer when someone buzzes
+      if (room.timer?.running) {
+        clearRoomTimer(room);
+        room.timer.running = false;
+      }
       broadcastRoom(room);
     }
     cb?.({ ok: true });
@@ -381,9 +556,11 @@ io.on('connection', (socket) => {
       room.lockedOut = new Set();
       room.questionRevealed = false;
       room.buzzerClosed = false;
+      room.hintRevealed = false;
+      clearRoomTimer(room);
+      room.timer = null;
     } else {
       player.score -= pts;
-      // Lock out the wrong answerer; close buzzer entirely after 3 wrong answers
       room.lockedOut.add(buzzerId);
       room.buzzer = null;
       room.phase = 'question';
@@ -406,11 +583,13 @@ io.on('connection', (socket) => {
     room.lockedOut = new Set();
     room.questionRevealed = false;
     room.buzzerClosed = false;
+    room.hintRevealed = false;
+    clearRoomTimer(room);
+    room.timer = null;
     broadcastRoom(room);
     cb?.({ ok: true });
   });
 
-  // Gamemaster steuert Media-Playback für alle
   socket.on('gm:media', ({ action, time }, cb) => {
     const room = getRoomBySocket(socket.id);
     if (!room || room.gamemasterId !== socket.id) return;
@@ -421,6 +600,7 @@ io.on('connection', (socket) => {
   socket.on('gm:end_game', (_, cb) => {
     const room = getRoomBySocket(socket.id);
     if (!room || room.gamemasterId !== socket.id) return;
+    clearRoomTimer(room);
     room.phase = 'end';
     broadcastRoom(room);
     cb?.({ ok: true });
@@ -430,6 +610,7 @@ io.on('connection', (socket) => {
     const room = getRoomBySocket(socket.id);
     if (!room) return;
     if (room.gamemasterId === socket.id) {
+      clearRoomTimer(room);
       io.to(room.code).emit('game:closed', { reason: 'Gamemaster hat das Spiel beendet' });
       delete rooms[room.code];
       return;
@@ -447,6 +628,8 @@ io.on('connection', (socket) => {
           room.activeQuestion = null;
           room.buzzOrder = [];
           room.lockedOut = new Set();
+          clearRoomTimer(room);
+          room.timer = null;
         }
       }
       broadcastRoom(room);
@@ -459,11 +642,10 @@ const HOST = process.env.HOST || '0.0.0.0';
 server.listen(PORT, HOST, () => {
   console.log(`Jeopardy server running on http://${HOST}:${PORT}`);
 
-  // Keep-alive: verhindert dass Render Free Plan den Server einschläfert
   if (process.env.RENDER_EXTERNAL_URL) {
     setInterval(() => {
       const url = process.env.RENDER_EXTERNAL_URL + '/api/auth/check';
       fetch(url).catch(() => {});
-    }, 10 * 60 * 1000); // alle 10 Minuten
+    }, 10 * 60 * 1000);
   }
 });

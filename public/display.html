@@ -57,7 +57,9 @@
   }
   .topbar-logo { font-family: 'Oswald', sans-serif; font-size: 1.4rem; color: var(--gold); letter-spacing: 3px; }
   .topbar-spacer { flex: 1; }
-  .score-pills { display: flex; gap: 10px; }
+  /* Bricht um, damit auch 16 Teams in die Topbar passen */
+  .score-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: 72%; }
+  .score-pills.many .score-pill { padding: 3px 10px; font-size: .72rem; }
   .score-pill {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -730,7 +732,9 @@ function render(s) {
 
 function renderScores(s) {
   const sorted = [...(s.scoreboard || s.players)].sort((a, b) => b.score - a.score);
-  document.getElementById('scorePills').innerHTML = sorted.map(p => {
+  const box = document.getElementById('scorePills');
+  box.classList.toggle('many', sorted.length > 8);
+  box.innerHTML = sorted.map(p => {
     const dot = p.color
       ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:7px"></span>`
       : '';

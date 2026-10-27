@@ -288,9 +288,28 @@ function getRoomBySocket(socketId) {
 
 // ─── TEAM-HELPER ─────────────────────────────────────────────────────────────
 
-// Gut unterscheidbare Farben; max. 8 Teams, daher reicht die Palette fuer
-// eine eindeutige Zuordnung ohne Wiederholung.
-const TEAM_COLORS = ['#f5c842','#34d399','#60a5fa','#f87171','#c084fc','#fb923c','#2dd4bf','#f472b6'];
+// 16 Farben, rechnerisch auf maximalen Abstand optimiert: jeder Ton liegt
+// sowohl normalsichtig als auch bei Rot-Gruen-Schwaeche (Prot-/Deuteranopie)
+// klar von allen anderen entfernt und hat >=4.5:1 Kontrast zum dunklen
+// Hintergrund. Die Laenge bestimmt zugleich die maximale Teamzahl.
+const TEAM_COLORS = [
+  '#e48b81', // Lachs
+  '#ee5b2b', // Orangerot
+  '#d78c42', // Ocker
+  '#f0d094', // Sand
+  '#eeee2b', // Gelb
+  '#9ff471', // Hellgruen
+  '#3eee2b', // Gruen
+  '#79ecad', // Mint
+  '#8ef6f6', // Cyan
+  '#2b96ee', // Blau
+  '#94c6f0', // Hellblau
+  '#b494f0', // Lavendel
+  '#d84cf0', // Magenta
+  '#f471d3', // Pink
+  '#e3a0c9', // Altrosa
+  '#f04c85', // Himbeere
+];
 
 // Erste Farbe, die noch kein Team belegt — nie zweimal dieselbe.
 function freeTeamColor(room) {

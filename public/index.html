@@ -339,6 +339,12 @@
 
   /* ── TEAM-AUSWAHL ── */
   .team-list { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+  /* Ab vielen Teams zweispaltig, damit die Liste aufs Handy passt */
+  .team-list.compact { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .team-list.compact .team-card { padding: 10px 11px; gap: 8px; }
+  .team-list.compact .team-card-name { font-size: .88rem; }
+  .team-list.compact .team-members { display: none; }
+  .team-list.compact .team-card-count { font-size: .78rem; }
   .team-card {
     display: flex; align-items: center; gap: 12px;
     background: var(--surface2); border: 2px solid var(--border);
@@ -874,6 +880,7 @@ function renderTeamPicker(s) {
   if (s.mode !== 'teams') { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
   const list = document.getElementById('teamList');
+  list.classList.toggle('compact', (s.teams || []).length > 6);
   if (!s.teams || s.teams.length === 0) {
     list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:.9rem">Noch keine Teams — gründe das erste!</div>';
     return;

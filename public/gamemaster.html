@@ -597,7 +597,6 @@
           <div class="buzzer-box-label">Erster Buzzer</div>
           <div class="buzzer-name" id="gmBuzzerName"></div>
           <div id="gmBuzzerPlayer" style="font-size:.9rem;color:var(--text-muted);margin-top:4px"></div>
-          <div id="gmBuzzOrder" style="font-size:.8rem;color:var(--text-dim);margin-top:6px"></div>
         </div>
         <div class="judge-row" id="judgeRow" style="display:none">
           <button class="btn btn-success btn-lg" onclick="judge(true)">✓ Richtig</button>
@@ -1111,9 +1110,6 @@ function renderQuestion(s) {
     const pl = document.getElementById('gmBuzzerPlayer');
     pl.textContent = (s.mode === 'teams' && s.buzzerPlayerName)
       ? 'gedrückt von: ' + s.buzzerPlayerName : '';
-    const ord = document.getElementById('gmBuzzOrder');
-    ord.textContent = (s.buzzOrder && s.buzzOrder.length > 1)
-      ? 'Reihenfolge: ' + s.buzzOrder.join(' → ') : '';
     judgeRow.style.display = 'flex';
   } else if (!s.questionRevealed) {
     revealRow.style.display = 'flex';

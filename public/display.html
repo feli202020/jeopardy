@@ -330,6 +330,64 @@
   .podium-emoji { font-size: 2.5rem; }
   .podium-name { font-weight: 800; font-size: 1.2rem; }
   .podium-score { font-family: 'Oswald', sans-serif; font-size: 1.8rem; color: var(--gold); }
+
+  /* ── URTEILS-FLASH ── */
+  #judgeFlash {
+    position: fixed; inset: 0; z-index: 940;
+    pointer-events: none; opacity: 0;
+    background: radial-gradient(circle at center, transparent 35%, currentColor 100%);
+  }
+  #judgeFlash.correct { color: rgba(52,211,153,.85); animation: flashIn .85s ease-out; }
+  #judgeFlash.wrong   { color: rgba(248,113,113,.85); animation: flashIn .85s ease-out; }
+  @keyframes flashIn {
+    0%   { opacity: 0; }
+    18%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  /* Bei falscher Antwort wackelt die Buehne kurz */
+  .shake { animation: shakeX .5s cubic-bezier(.36,.07,.19,.97); }
+  @keyframes shakeX {
+    10%, 90% { transform: translateX(-3px); }
+    20%, 80% { transform: translateX(6px); }
+    30%, 50%, 70% { transform: translateX(-11px); }
+    40%, 60% { transform: translateX(11px); }
+  }
+
+  /* ── DAILY DOUBLE ── */
+  #ddOverlay {
+    position: fixed; inset: 0; z-index: 970;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    background: radial-gradient(circle at center, #2b1d53 0%, #0a0911 70%);
+    overflow: hidden;
+  }
+  #ddOverlay.show { display: flex; animation: ddFade .4s ease-out; }
+  @keyframes ddFade { from { opacity: 0 } to { opacity: 1 } }
+  #ddStar {
+    font-size: 11vw; color: var(--gold);
+    text-shadow: 0 0 60px rgba(245,200,66,.75);
+    animation: ddSpin 1.1s cubic-bezier(.2,.8,.3,1);
+  }
+  @keyframes ddSpin {
+    from { transform: scale(0) rotate(-220deg); opacity: 0 }
+    to   { transform: scale(1) rotate(0); opacity: 1 }
+  }
+  #ddTitle {
+    font-family: 'Oswald', sans-serif;
+    font-size: clamp(2.5rem, 9vw, 7rem);
+    letter-spacing: .14em; color: var(--gold);
+    text-shadow: 0 0 70px rgba(245,200,66,.6);
+    animation: ddPop .55s .18s backwards cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes ddPop {
+    from { transform: scale(2.4); opacity: 0; filter: blur(14px) }
+    to   { transform: scale(1); opacity: 1; filter: blur(0) }
+  }
+  #ddSub {
+    font-size: clamp(1rem, 2.4vw, 1.7rem);
+    color: #fde68a; letter-spacing: .22em; text-transform: uppercase;
+    animation: ddPop .5s .42s backwards;
+  }
 </style>
 </head>
 <body>
@@ -379,6 +437,16 @@
     </svg>
     <div class="timer-ring-value" id="timerOverlayValue">--</div>
   </div>
+</div>
+
+<!-- Urteils-Flash -->
+<div id="judgeFlash"></div>
+
+<!-- Daily Double -->
+<div id="ddOverlay">
+  <div id="ddStar">&#9733;</div>
+  <div id="ddTitle">DAILY DOUBLE</div>
+  <div id="ddSub">Doppelte Punkte!</div>
 </div>
 
 <canvas id="confetti" style="position:fixed;inset:0;pointer-events:none;z-index:950;display:none"></canvas>
@@ -498,6 +566,34 @@ const Snd = {
 ['click','keydown'].forEach(ev =>
   document.addEventListener(ev, () => Snd.unlock(), { once: true }));
 
+// ── URTEILS-FLASH ───────────────────────────────────────────────────────────
+socket.on('judge:result', ({ correct }) => {
+  const fl = document.getElementById('judgeFlash');
+  fl.className = '';
+  void fl.offsetWidth;            // Reflow, damit die Animation neu startet
+  fl.className = correct ? 'correct' : 'wrong';
+  if (correct) {
+    Snd.correct();
+  } else {
+    Snd.wrong();
+    const stage = document.getElementById('main');
+    stage.classList.remove('shake');
+    void stage.offsetWidth;
+    stage.classList.add('shake');
+    setTimeout(() => stage.classList.remove('shake'), 600);
+  }
+});
+
+// ── DAILY DOUBLE ────────────────────────────────────────────────────────────
+let ddShownFor = null;
+function showDailyDouble() {
+  const ov = document.getElementById('ddOverlay');
+  ov.classList.add('show');
+  // Aufsteigende Fanfare
+  [392, 523, 659, 784, 1047].forEach((f, i) => Snd.tone(f, .42, 'triangle', .22, i * .13));
+  setTimeout(() => ov.classList.remove('show'), 2600);
+}
+
 // ── KONFETTI ────────────────────────────────────────────────────────────────
 let confettiRun = false;
 function launchConfetti() {
@@ -565,7 +661,7 @@ function handleMediaSync({ action, time }) {
   }
 }
 
-let prevPhase = null, prevBuzzer = null, prevScoreSum = null;
+let prevPhase = null, prevBuzzer = null;
 
 function render(s) {
   document.getElementById('waiting').style.display = 'none';
@@ -576,12 +672,6 @@ function render(s) {
   // Sounds nur bei echten Zustandswechseln, nicht bei jedem Timer-Tick
   if (s.phase === 'lobby') Snd.startLobby(); else Snd.stopLobby();
   if (s.phase === 'buzzed' && prevBuzzer !== s.buzzer && s.buzzer) Snd.buzz();
-  if (prevPhase === 'buzzed' && s.phase !== 'buzzed') {
-    const sum = (s.scoreboard || []).reduce((a, e) => a + e.score, 0);
-    if (prevScoreSum !== null && sum > prevScoreSum) Snd.correct();
-    else if (prevScoreSum !== null && sum < prevScoreSum) Snd.wrong();
-  }
-  prevScoreSum = (s.scoreboard || []).reduce((a, e) => a + e.score, 0);
   prevPhase = s.phase;
   prevBuzzer = s.buzzer;
 
@@ -590,6 +680,14 @@ function render(s) {
     renderEnd(s);
     document.getElementById('buzzerBanner').classList.remove('active');
     return;
+  }
+
+  // Daily Double genau einmal pro Frage ankuendigen
+  if (s.activeQuestion && s.activeQuestion.isDailyDouble) {
+    const key = s.activeQuestion.categoryIdx + ':' + s.activeQuestion.questionIdx;
+    if (ddShownFor !== key) { ddShownFor = key; showDailyDouble(); }
+  } else if (!s.activeQuestion) {
+    ddShownFor = null;
   }
 
   if (s.activeQuestion) {

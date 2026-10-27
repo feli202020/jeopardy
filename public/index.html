@@ -320,10 +320,6 @@
   @keyframes pulseScale { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
 
   /* Buzz-Platzierung */
-  .buzz-rank {
-    font-size: 1.1rem; font-weight: 800; color: var(--gold);
-    text-align: center; min-height: 24px;
-  }
 
   /* ── COUNTDOWN-OVERLAY ── */
   #countdownOverlay {
@@ -601,7 +597,6 @@
       </div>
       <button class="buzzer-btn" id="buzzerBtn" onclick="buzz()">BUZZ!</button>
       <div class="buzzer-status" id="buzzerStatus">Drücke BUZZ wenn du die Antwort weißt!</div>
-      <div class="buzz-rank" id="buzzRank"></div>
       <div class="buzzed-announce" id="buzzedAnnounce"></div>
     </div>
   </div>
@@ -961,7 +956,6 @@ function renderQuestion(s) {
       btn.disabled = true;
       btn.className = 'buzzer-btn';
       document.getElementById('buzzerStatus').textContent = 'Warte auf die nächste Frage…';
-      document.getElementById('buzzRank').textContent = '';
       document.getElementById('buzzedAnnounce').textContent = '';
     }
     return;
@@ -1012,7 +1006,6 @@ function renderQuestion(s) {
   const status = document.getElementById('buzzerStatus');
   const announce = document.getElementById('buzzedAnnounce');
 
-  const rank = document.getElementById('buzzRank');
   const isTeams = s.mode === 'teams';
 
   if (s.phase === 'question') {
@@ -1029,7 +1022,6 @@ function renderQuestion(s) {
     }
     announce.textContent = '';
     announce.className = 'buzzed-announce';
-    rank.textContent = '';
   } else if (s.phase === 'buzzed') {
     const wasEnabled = !btn.disabled;
     btn.disabled = true;
@@ -1048,11 +1040,6 @@ function renderQuestion(s) {
       status.textContent = '';
       announce.textContent = (s.buzzer || '???') + ' hat gebuzzert!';
       announce.className = 'buzzed-announce';
-    }
-    // Platzierung anzeigen — bei großen Gruppen überraschend motivierend
-    if (mine && s.buzzOrder) {
-      const pos = s.buzzOrder.indexOf(mine.name);
-      rank.textContent = pos >= 0 ? (pos === 0 ? '⚡ Du warst zuerst!' : `Du warst #${pos + 1}`) : '';
     }
   }
 }

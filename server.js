@@ -288,7 +288,15 @@ function getRoomBySocket(socketId) {
 
 // ─── TEAM-HELPER ─────────────────────────────────────────────────────────────
 
+// Gut unterscheidbare Farben; max. 8 Teams, daher reicht die Palette fuer
+// eine eindeutige Zuordnung ohne Wiederholung.
 const TEAM_COLORS = ['#f5c842','#34d399','#60a5fa','#f87171','#c084fc','#fb923c','#2dd4bf','#f472b6'];
+
+// Erste Farbe, die noch kein Team belegt — nie zweimal dieselbe.
+function freeTeamColor(room) {
+  const used = new Set(Object.values(room.teams).map(t => t.color));
+  return TEAM_COLORS.find(c => !used.has(c)) || null;
+}
 
 // Die "Buzz-Einheit": im Team-Modus das Team, sonst der Spieler selbst.
 // Darauf wirken Lockout und Punkte.
@@ -538,9 +546,10 @@ io.on('connection', (socket) => {
     const taken = Object.values(room.teams)
       .some(t => t.name.toLowerCase() === name.toLowerCase());
     if (taken) return { error: 'Teamname bereits vergeben' };
-    if (Object.keys(room.teams).length >= 8) return { error: 'Maximal 8 Teams' };
+    const color = freeTeamColor(room);
+    // Ohne freie Farbe kein weiteres Team: Farben muessen eindeutig bleiben
+    if (!color) return { error: `Maximal ${TEAM_COLORS.length} Teams` };
     const id = uuidv4().slice(0, 8);
-    const color = TEAM_COLORS[Object.keys(room.teams).length % TEAM_COLORS.length];
     room.teams[id] = { id, name, score: 0, color };
     return { team: room.teams[id] };
   }
@@ -780,6 +789,14 @@ io.on('connection', (socket) => {
       room.buzzerClosed = limitHit || room.lockedOut.size >= activeUnitCount(room);
     }
     broadcastRoom(room);
+    // Explizites Urteil fuer die Anzeige — zuverlaessiger als ein
+    // Vergleich der Punktesumme auf Client-Seite.
+    io.to(room.code).emit('judge:result', {
+      correct: !!correct,
+      unit: unitLabel(room, buzzerId),
+      color: teamColorOf(room, buzzerId),
+      points: correct ? pts : -pts,
+    });
     cb?.({ ok: true });
   });
 

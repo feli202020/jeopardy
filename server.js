@@ -276,8 +276,6 @@ async function createRoom(quizId, gamemasterSocketId) {
     // Timer state
     timer: null,         // { duration: 30, remaining: 30, running: false }
     timerInterval: null, // server-side interval handle
-    // Hint state
-    hintRevealed: false,
   };
   return rooms[code];
 }
@@ -389,10 +387,8 @@ function roomPublicState(room) {
       mediaType: activeQ(room)?.mediaType,
       mediaUrl: activeQ(room)?.mediaUrl,
       question: room.questionRevealed ? activeQ(room)?.question : null,
-      hint: room.hintRevealed ? (activeQ(room)?.hint || null) : null,
     } : null,
     questionRevealed: !!room.questionRevealed,
-    hintRevealed: !!room.hintRevealed,
     buzzerClosed: !!room.buzzerClosed,
     buzzer: room.buzzer ? unitLabel(room, room.buzzer) : null,
     buzzerTeamColor: room.buzzer ? teamColorOf(room, room.buzzer) : null,
@@ -429,7 +425,6 @@ function gamemasterState(room) {
       ...pub.activeQuestion,
       question: activeQ(room)?.question,
       answer: activeQ(room)?.answer,
-      hint: activeQ(room)?.hint || null,
     };
   }
   return pub;
@@ -633,7 +628,6 @@ io.on('connection', (socket) => {
     room.phase = 'question';
     room.questionRevealed = true;
     room.buzzerClosed = false;
-    room.hintRevealed = false;
     // Reset timer if configured
     if (room.pendingTimerDuration) {
       room.timer = { duration: room.pendingTimerDuration, remaining: room.pendingTimerDuration, running: false };
@@ -650,15 +644,6 @@ io.on('connection', (socket) => {
     if (!room || room.gamemasterId !== socket.id) return;
     if (room.phase !== 'question') return;
     room.questionRevealed = true;
-    broadcastRoom(room);
-    cb?.({ ok: true });
-  });
-
-  socket.on('gm:reveal_hint', (_, cb) => {
-    const room = getRoomBySocket(socket.id);
-    if (!room || room.gamemasterId !== socket.id) return;
-    if (!['question', 'buzzed'].includes(room.phase)) return;
-    room.hintRevealed = true;
     broadcastRoom(room);
     cb?.({ ok: true });
   });
@@ -784,7 +769,6 @@ io.on('connection', (socket) => {
       room.lockedOut = new Set();
       room.questionRevealed = false;
       room.buzzerClosed = false;
-      room.hintRevealed = false;
       clearRoomTimer(room);
       room.timer = null;
     } else {
@@ -812,7 +796,6 @@ io.on('connection', (socket) => {
     room.lockedOut = new Set();
     room.questionRevealed = false;
     room.buzzerClosed = false;
-    room.hintRevealed = false;
     clearRoomTimer(room);
     room.timer = null;
     broadcastRoom(room);

@@ -251,24 +251,6 @@
   }
   .timer-ring-value.urgent { color: var(--red); }
 
-  /* ── HINT BANNER ── */
-  #hintBanner {
-    position: fixed;
-    top: 60px; left: 24px;
-    background: var(--surface);
-    border: 2px solid rgba(99,102,241,.5);
-    border-radius: var(--radius);
-    padding: 14px 20px;
-    display: none;
-    flex-direction: column;
-    gap: 4px;
-    z-index: 60;
-    max-width: 380px;
-    box-shadow: 0 4px 24px rgba(0,0,0,.5);
-  }
-  #hintBanner.active { display: flex; }
-  .hint-banner-label { font-size: .65rem; text-transform: uppercase; letter-spacing: 2px; color: #a5b4fc; font-weight: 700; }
-  .hint-banner-text { font-size: 1rem; font-weight: 700; color: #c7d2fe; line-height: 1.4; }
 
   /* ── AUTOPLAY OVERLAY ── */
   #autoplayOverlay {
@@ -397,11 +379,6 @@
     </svg>
     <div class="timer-ring-value" id="timerOverlayValue">--</div>
   </div>
-</div>
-
-<div id="hintBanner">
-  <div class="hint-banner-label">💡 Hinweis</div>
-  <div class="hint-banner-text" id="hintBannerText"></div>
 </div>
 
 <canvas id="confetti" style="position:fixed;inset:0;pointer-events:none;z-index:950;display:none"></canvas>
@@ -651,15 +628,6 @@ function render(s) {
     timerOv.classList.remove('active');
   }
 
-  // Hint banner
-  const hintBanner = document.getElementById('hintBanner');
-  const hintText = document.getElementById('hintBannerText');
-  if (s.hintRevealed && s.activeQuestion?.hint) {
-    hintBanner.classList.add('active');
-    hintText.textContent = s.activeQuestion.hint;
-  } else {
-    hintBanner.classList.remove('active');
-  }
 }
 
 function renderScores(s) {

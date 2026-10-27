@@ -404,6 +404,12 @@
   <div class="hint-banner-text" id="hintBannerText"></div>
 </div>
 
+<canvas id="confetti" style="position:fixed;inset:0;pointer-events:none;z-index:950;display:none"></canvas>
+<div id="dispCountdown" style="position:fixed;inset:0;z-index:960;background:rgba(10,9,17,.93);
+     display:none;align-items:center;justify-content:center">
+  <div id="dispCountdownNum" style="font-family:'Oswald',sans-serif;font-size:22vw;color:var(--gold);
+       text-shadow:0 0 100px rgba(245,200,66,.4)">3</div>
+</div>
 <div id="buzzerBanner">
   <div class="buzzer-flash"></div>
   <div>
@@ -458,6 +464,104 @@ function show(viewId) {
 
 socket.on('room:update', render);
 
+// ── COUNTDOWN (vom Gamemaster ausgeloest) ───────────────────────────────────
+socket.on('buzz:countdown', ({ n }) => {
+  const ov = document.getElementById('dispCountdown');
+  const el = document.getElementById('dispCountdownNum');
+  if (n > 0) Snd.tick(); else Snd.go();
+  if (n > 0) {
+    ov.style.display = 'flex';
+    el.textContent = n;
+    el.animate([{ transform: 'scale(2)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 400 });
+  } else {
+    el.textContent = 'GO!';
+    setTimeout(() => { ov.style.display = 'none'; }, 500);
+  }
+});
+
+// ── SOUND (Display = Rechner am Beamer, hier haengen die Lautsprecher) ──────
+const Snd = {
+  ctx: null, lobby: null, armed: false,
+  unlock() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) this.ctx = new AC();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    this.armed = true;
+  },
+  tone(f, d, type = 'sine', vol = .2, delay = 0) {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t0);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + .015);
+    g.gain.exponentialRampToValueAtTime(.0001, t0 + d);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(t0); o.stop(t0 + d + .05);
+  },
+  buzz()    { this.tone(170, .3, 'square', .28); },
+  correct() { [523,659,784,1047].forEach((f,i) => this.tone(f, .32, 'triangle', .2, i*.1)); },
+  wrong()   { this.tone(200, .5, 'sawtooth', .2); this.tone(150, .55, 'sawtooth', .18, .12); },
+  tick()    { this.tone(880, .1, 'sine', .16); },
+  go()      { this.tone(1320, .3, 'triangle', .22); },
+  startLobby() {
+    if (this.lobby || !this.armed) return;
+    const a = new Audio('/sounds/lobby.mp3');
+    a.loop = true; a.volume = .35;
+    const pr = a.play();
+    if (pr) pr.then(() => { this.lobby = a; }).catch(() => {});
+  },
+  stopLobby() {
+    if (this.lobby) { this.lobby.pause(); this.lobby = null; }
+  }
+};
+// Audio braucht eine Nutzergeste — erster Klick/Tastendruck schaltet frei
+['click','keydown'].forEach(ev =>
+  document.addEventListener(ev, () => Snd.unlock(), { once: true }));
+
+// ── KONFETTI ────────────────────────────────────────────────────────────────
+let confettiRun = false;
+function launchConfetti() {
+  if (confettiRun) return;
+  confettiRun = true;
+  const cv = document.getElementById('confetti');
+  const ctx = cv.getContext('2d');
+  cv.style.display = 'block';
+  cv.width = innerWidth; cv.height = innerHeight;
+  const colors = ['#f5c842', '#34d399', '#60a5fa', '#f87171', '#c084fc', '#fb923c'];
+  const bits = [];
+  for (let i = 0; i < 160; i++) {
+    bits.push({
+      x: Math.random() * cv.width,
+      y: -20 - Math.random() * cv.height,
+      w: 6 + Math.random() * 7,
+      h: 9 + Math.random() * 11,
+      c: colors[(Math.random() * colors.length) | 0],
+      vy: 1.6 + Math.random() * 3.2,
+      vx: -1.2 + Math.random() * 2.4,
+      rot: Math.random() * Math.PI,
+      vr: -0.1 + Math.random() * 0.2,
+    });
+  }
+  const t0 = Date.now();
+  (function frame() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    bits.forEach(b => {
+      b.x += b.vx; b.y += b.vy; b.rot += b.vr;
+      if (b.y > cv.height + 30) { b.y = -20; b.x = Math.random() * cv.width; }
+      ctx.save();
+      ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+      ctx.fillStyle = b.c;
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      ctx.restore();
+    });
+    if (Date.now() - t0 < 9000) requestAnimationFrame(frame);
+    else { cv.style.display = 'none'; confettiRun = false; }
+  })();
+}
+
 socket.on('media:sync', (data) => {
   if (!audioUnlocked) { pendingSync = data; return; }
   handleMediaSync(data);
@@ -484,11 +588,25 @@ function handleMediaSync({ action, time }) {
   }
 }
 
+let prevPhase = null, prevBuzzer = null, prevScoreSum = null;
+
 function render(s) {
   document.getElementById('waiting').style.display = 'none';
   document.getElementById('main').classList.add('active');
 
   renderScores(s);
+
+  // Sounds nur bei echten Zustandswechseln, nicht bei jedem Timer-Tick
+  if (s.phase === 'lobby') Snd.startLobby(); else Snd.stopLobby();
+  if (s.phase === 'buzzed' && prevBuzzer !== s.buzzer && s.buzzer) Snd.buzz();
+  if (prevPhase === 'buzzed' && s.phase !== 'buzzed') {
+    const sum = (s.scoreboard || []).reduce((a, e) => a + e.score, 0);
+    if (prevScoreSum !== null && sum > prevScoreSum) Snd.correct();
+    else if (prevScoreSum !== null && sum < prevScoreSum) Snd.wrong();
+  }
+  prevScoreSum = (s.scoreboard || []).reduce((a, e) => a + e.score, 0);
+  prevPhase = s.phase;
+  prevBuzzer = s.buzzer;
 
   if (s.phase === 'end') {
     show('endView');
@@ -545,12 +663,16 @@ function render(s) {
 }
 
 function renderScores(s) {
-  const sorted = [...s.players].sort((a, b) => b.score - a.score);
-  document.getElementById('scorePills').innerHTML = sorted.map(p => `
+  const sorted = [...(s.scoreboard || s.players)].sort((a, b) => b.score - a.score);
+  document.getElementById('scorePills').innerHTML = sorted.map(p => {
+    const dot = p.color
+      ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:7px"></span>`
+      : '';
+    return `
     <div class="score-pill">
-      <span class="pname">${esc(p.name)}</span>
+      <span class="pname">${dot}${esc(p.name)}</span>
       <span class="pscore ${p.score < 0 ? 'neg' : ''}">$${p.score}</span>
-    </div>`).join('');
+    </div>`; }).join('');
 }
 
 function renderBoard(s) {
@@ -609,7 +731,8 @@ function renderQuestion(s) {
 }
 
 function renderEnd(s) {
-  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const sorted = [...(s.scoreboard || s.players)].sort((a, b) => b.score - a.score);
+  launchConfetti();
   const medals = ['🥇','🥈','🥉'];
   const cls = ['p1','p2','p3'];
   document.getElementById('dispPodium').innerHTML = sorted.slice(0,3).map((p,i) => `

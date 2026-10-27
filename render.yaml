@@ -12,7 +12,5 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      - key: GAMEMASTER_PASSWORD
-        sync: false
       - key: SESSION_SECRET
         generateValue: true

@@ -74,30 +74,40 @@ app.post('/api/auth/register', async (req, res) => {
   if (!USERNAME_RE.test(username)) return res.status(400).json({ error: 'Benutzername: 4–16 Zeichen, nur Buchstaben, Zahlen, _ oder -' });
   if (password.length < 4 || password.length > 16) return res.status(400).json({ error: 'Passwort muss 4–16 Zeichen lang sein' });
 
-  // Check username taken
-  const { data: existing } = await supabase.from('users').select('id').ilike('username', username).maybeSingle();
-  if (existing) return res.status(409).json({ error: 'Benutzername bereits vergeben' });
+  try {
+    // Check username taken
+    const { data: existing } = await supabase.from('users').select('id').ilike('username', username).maybeSingle();
+    if (existing) return res.status(409).json({ error: 'Benutzername bereits vergeben' });
 
-  const hash = await bcrypt.hash(password, 10);
-  const id = uuidv4();
-  const { error } = await supabase.from('users').insert({ id, username, password_hash: hash });
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ ok: true });
+    const hash = await bcrypt.hash(password, 10);
+    const id = uuidv4();
+    const { error } = await supabase.from('users').insert({ id, username, password_hash: hash });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[register] Datenbank nicht erreichbar:', e.message);
+    res.status(503).json({ error: 'Datenbank nicht erreichbar. Bitte später erneut versuchen.' });
+  }
 });
 
 app.post('/api/auth/user-login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Benutzername und Passwort erforderlich' });
 
-  const { data: user } = await supabase.from('users').select('id, username, password_hash').ilike('username', username).maybeSingle();
-  if (!user) return res.status(401).json({ error: 'Falscher Benutzername oder Passwort' });
+  try {
+    const { data: user } = await supabase.from('users').select('id, username, password_hash').ilike('username', username).maybeSingle();
+    if (!user) return res.status(401).json({ error: 'Falscher Benutzername oder Passwort' });
 
-  const ok = await bcrypt.compare(password, user.password_hash);
-  if (!ok) return res.status(401).json({ error: 'Falscher Benutzername oder Passwort' });
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Falscher Benutzername oder Passwort' });
 
-  req.session.userId = user.id;
-  req.session.username = user.username;
-  res.json({ ok: true, username: user.username });
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    res.json({ ok: true, username: user.username });
+  } catch (e) {
+    console.error('[login] Datenbank nicht erreichbar:', e.message);
+    res.status(503).json({ error: 'Datenbank nicht erreichbar. Bitte später erneut versuchen.' });
+  }
 });
 
 app.post('/api/auth/user-logout', (req, res) => {
@@ -258,6 +268,11 @@ async function createRoom(quizId, gamemasterSocketId) {
     lockedOut: new Set(),
     questionRevealed: false,
     buzzerClosed: false,
+    // Team-Modus: 'solo' = jeder für sich, 'teams' = Punkte & Lockout pro Team
+    mode: 'solo',
+    teams: {},           // { teamId: { id, name, score, color } }
+    // Max. Fehlversuche pro Frage (GM-einstellbar, 0 = unbegrenzt)
+    maxLockouts: 3,
     // Timer state
     timer: null,         // { duration: 30, remaining: 30, running: false }
     timerInterval: null, // server-side interval handle
@@ -273,6 +288,72 @@ function getRoomBySocket(socketId) {
   );
 }
 
+// ─── TEAM-HELPER ─────────────────────────────────────────────────────────────
+
+const TEAM_COLORS = ['#f5c842','#34d399','#60a5fa','#f87171','#c084fc','#fb923c','#2dd4bf','#f472b6'];
+
+// Die "Buzz-Einheit": im Team-Modus das Team, sonst der Spieler selbst.
+// Darauf wirken Lockout und Punkte.
+function buzzUnitId(room, socketId) {
+  const p = room.players[socketId];
+  if (!p) return null;
+  if (room.mode === 'teams' && p.teamId) return 'team:' + p.teamId;
+  return socketId;
+}
+
+// Öffentlich sichtbarer Name einer Buzz-Einheit (Team-Modus: nur der Teamname)
+function unitLabel(room, socketId) {
+  const p = room.players[socketId];
+  if (!p) return null;
+  if (room.mode === 'teams' && p.teamId) return room.teams[p.teamId]?.name || p.name;
+  return p.name;
+}
+
+// Zählt, wie viele Einheiten überhaupt noch buzzern dürften
+function activeUnitCount(room) {
+  const units = new Set();
+  for (const [sid, p] of Object.entries(room.players)) {
+    if (!p.online) continue;
+    units.add(buzzUnitId(room, sid));
+  }
+  return units.size;
+}
+
+// Punkte gutschreiben/abziehen — im Team-Modus aufs Team
+function addScore(room, socketId, pts) {
+  const p = room.players[socketId];
+  if (!p) return;
+  if (room.mode === 'teams' && p.teamId && room.teams[p.teamId]) {
+    room.teams[p.teamId].score += pts;
+  } else {
+    p.score += pts;
+  }
+}
+
+// Scoreboard-Einträge: im Team-Modus eine Zeile pro Team
+function scoreboard(room) {
+  if (room.mode === 'teams') {
+    return Object.values(room.teams).map(t => ({
+      id: t.id,
+      name: t.name,
+      score: t.score,
+      color: t.color,
+      isTeam: true,
+      members: Object.values(room.players)
+        .filter(p => p.teamId === t.id)
+        .map(p => ({ name: p.name, online: p.online })),
+      online: Object.values(room.players).some(p => p.teamId === t.id && p.online),
+    }));
+  }
+  return Object.values(room.players).map(p => ({
+    id: p.socketId,
+    name: p.name,
+    score: p.score,
+    isTeam: false,
+    online: p.online,
+  }));
+}
+
 function roomPublicState(room) {
   return {
     code: room.code,
@@ -286,8 +367,20 @@ function roomPublicState(room) {
       }))
     })),
     players: Object.values(room.players).map(p => ({
-      name: p.name, score: p.score, socketId: p.socketId, online: p.online
+      name: p.name, score: p.score, socketId: p.socketId, online: p.online,
+      teamId: p.teamId || null,
     })),
+    mode: room.mode,
+    teams: Object.values(room.teams).map(t => ({
+      id: t.id, name: t.name, score: t.score, color: t.color,
+      memberCount: Object.values(room.players).filter(p => p.teamId === t.id).length,
+      members: Object.values(room.players)
+        .filter(p => p.teamId === t.id)
+        .map(p => ({ name: p.name, online: p.online })),
+    })),
+    scoreboard: scoreboard(room),
+    maxLockouts: room.maxLockouts,
+    lockedOutCount: room.lockedOut.size,
     activeQuestion: room.activeQuestion ? {
       categoryIdx: room.activeQuestion.categoryIdx,
       questionIdx: room.activeQuestion.questionIdx,
@@ -301,8 +394,9 @@ function roomPublicState(room) {
     questionRevealed: !!room.questionRevealed,
     hintRevealed: !!room.hintRevealed,
     buzzerClosed: !!room.buzzerClosed,
-    buzzer: room.buzzer ? room.players[room.buzzer]?.name : null,
-    buzzOrder: room.buzzOrder.map(id => room.players[id]?.name).filter(Boolean),
+    buzzer: room.buzzer ? unitLabel(room, room.buzzer) : null,
+    buzzerTeamColor: room.buzzer ? teamColorOf(room, room.buzzer) : null,
+    buzzOrder: room.buzzOrder.map(id => unitLabel(room, id)).filter(Boolean),
     timer: room.timer ? {
       duration: room.timer.duration,
       remaining: room.timer.remaining,
@@ -317,8 +411,19 @@ function activeQ(room) {
   return room.board[categoryIdx]?.questions[questionIdx] || null;
 }
 
+function teamColorOf(room, socketId) {
+  const p = room.players[socketId];
+  if (!p || room.mode !== 'teams' || !p.teamId) return null;
+  return room.teams[p.teamId]?.color || null;
+}
+
 function gamemasterState(room) {
   const pub = roomPublicState(room);
+  // GM sieht zusätzlich, WER konkret gebuzzert hat (Spieler sehen nur das Team)
+  pub.buzzerPlayerName = room.buzzer ? room.players[room.buzzer]?.name || null : null;
+  pub.buzzOrderPlayers = room.buzzOrder
+    .map(id => room.players[id]?.name)
+    .filter(Boolean);
   if (room.activeQuestion) {
     pub.activeQuestion = {
       ...pub.activeQuestion,
@@ -387,22 +492,107 @@ io.on('connection', (socket) => {
       existing.online = true;
       room.players[socket.id] = existing;
       if (room.buzzer === existing.socketId) room.buzzer = socket.id;
-      room.lockedOut.delete(existing.socketId);
+      // Solo-Modus: Lockout hing am Socket -> mitziehen. Team-Lockout bleibt bestehen.
+      if (room.mode !== 'teams') room.lockedOut.delete(existing.socketId);
       socket.join(room.code);
       broadcastRoom(room);
       return cb({ ok: true, state: roomPublicState(room), playerId: socket.id, rejoined: true });
     }
 
-    if (room.phase !== 'lobby') return cb({ error: 'Spiel bereits gestartet' });
     const nameTaken = Object.values(room.players).find(
       p => p.name.toLowerCase() === playerName.toLowerCase()
     );
     if (nameTaken) return cb({ error: 'Name bereits vergeben' });
 
-    room.players[socket.id] = { name: playerName, score: 0, socketId: socket.id, online: true };
+    // Nachzügler dürfen auch im laufenden Spiel beitreten (wichtig bei großen Gruppen)
+    room.players[socket.id] = { name: playerName, score: 0, socketId: socket.id, online: true, teamId: null };
     socket.join(room.code);
     broadcastRoom(room);
     cb({ ok: true, state: roomPublicState(room), playerId: socket.id });
+  });
+
+  // ─── TEAMS ─────────────────────────────────────────────────────────────────
+
+  socket.on('gm:set_mode', ({ mode }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    if (room.phase !== 'lobby') return cb?.({ error: 'Nur in der Lobby änderbar' });
+    if (!['solo', 'teams'].includes(mode)) return cb?.({ error: 'Ungültiger Modus' });
+    room.mode = mode;
+    if (mode === 'solo') {
+      // Team-Zuordnung lösen, Punkte bleiben beim Spieler
+      Object.values(room.players).forEach(p => { p.teamId = null; });
+    }
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  socket.on('gm:set_max_lockouts', ({ value }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    const v = parseInt(value, 10);
+    if (isNaN(v) || v < 0 || v > 99) return cb?.({ error: 'Wert muss 0–99 sein' });
+    room.maxLockouts = v;
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  function createTeam(room, rawName) {
+    const name = (rawName || '').trim().substring(0, 20);
+    if (!name) return { error: 'Bitte Teamnamen eingeben' };
+    const taken = Object.values(room.teams)
+      .some(t => t.name.toLowerCase() === name.toLowerCase());
+    if (taken) return { error: 'Teamname bereits vergeben' };
+    if (Object.keys(room.teams).length >= 8) return { error: 'Maximal 8 Teams' };
+    const id = uuidv4().slice(0, 8);
+    const color = TEAM_COLORS[Object.keys(room.teams).length % TEAM_COLORS.length];
+    room.teams[id] = { id, name, score: 0, color };
+    return { team: room.teams[id] };
+  }
+
+  socket.on('gm:create_team', ({ name }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    const r = createTeam(room, name);
+    if (r.error) return cb?.({ error: r.error });
+    broadcastRoom(room);
+    cb?.({ ok: true, team: r.team });
+  });
+
+  socket.on('gm:delete_team', ({ teamId }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    if (!room.teams[teamId]) return cb?.({ error: 'Team nicht gefunden' });
+    Object.values(room.players).forEach(p => {
+      if (p.teamId === teamId) p.teamId = null;
+    });
+    delete room.teams[teamId];
+    broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  // Spieler erstellt selbst ein Team (Lobby)
+  socket.on('player:create_team', ({ name }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || !room.players[socket.id]) return cb?.({ error: 'Nicht im Spiel' });
+    if (room.mode !== 'teams') return cb?.({ error: 'Kein Team-Modus' });
+    if (room.phase !== 'lobby') return cb?.({ error: 'Spiel läuft bereits' });
+    const r = createTeam(room, name);
+    if (r.error) return cb?.({ error: r.error });
+    room.players[socket.id].teamId = r.team.id;
+    broadcastRoom(room);
+    cb?.({ ok: true, teamId: r.team.id });
+  });
+
+  socket.on('player:join_team', ({ teamId }, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || !room.players[socket.id]) return cb?.({ error: 'Nicht im Spiel' });
+    if (room.mode !== 'teams') return cb?.({ error: 'Kein Team-Modus' });
+    if (room.phase !== 'lobby') return cb?.({ error: 'Spiel läuft bereits' });
+    if (!room.teams[teamId]) return cb?.({ error: 'Team nicht gefunden' });
+    room.players[socket.id].teamId = teamId;
+    broadcastRoom(room);
+    cb?.({ ok: true, teamId });
   });
 
   socket.on('observer:join', ({ code }, cb) => {
@@ -416,6 +606,14 @@ io.on('connection', (socket) => {
     const room = getRoomBySocket(socket.id);
     if (!room || room.gamemasterId !== socket.id) return;
     if (Object.keys(room.players).length === 0) return cb?.({ error: 'Keine Spieler' });
+    if (room.mode === 'teams') {
+      const teamCount = Object.keys(room.teams).length;
+      if (teamCount < 1) return cb?.({ error: 'Mindestens ein Team anlegen' });
+      const homeless = Object.values(room.players).filter(p => !p.teamId);
+      if (homeless.length > 0) {
+        return cb?.({ error: `Ohne Team: ${homeless.map(p => p.name).join(', ')}` });
+      }
+    }
     room.phase = 'board';
     broadcastRoom(room);
     cb?.({ ok: true });
@@ -506,9 +704,20 @@ io.on('connection', (socket) => {
   });
 
   // Manual score adjustment by GM
-  socket.on('gm:set_score', ({ socketId, score }, cb) => {
+  socket.on('gm:set_score', ({ socketId, teamId, score }, cb) => {
     const room = getRoomBySocket(socket.id);
     if (!room || room.gamemasterId !== socket.id) return;
+    // Im Team-Modus wird der Team-Score bearbeitet
+    if (teamId || room.mode === 'teams') {
+      const tid = teamId || room.players[socketId]?.teamId;
+      const team = room.teams[tid];
+      if (!team) return cb?.({ error: 'Team nicht gefunden' });
+      const p2 = parseInt(score);
+      if (isNaN(p2)) return cb?.({ error: 'Ungültiger Wert' });
+      team.score = p2;
+      broadcastRoom(room);
+      return cb?.({ ok: true });
+    }
     const player = room.players[socketId];
     if (!player) return cb?.({ error: 'Spieler nicht gefunden' });
     const parsed = parseInt(score);
@@ -520,10 +729,28 @@ io.on('connection', (socket) => {
 
   socket.on('player:buzz', (_, cb) => {
     const room = getRoomBySocket(socket.id);
-    if (!room || !room.players[socket.id]) return;
-    if (room.phase !== 'question') return;
-    if (room.lockedOut.size >= 3) return cb?.({ error: 'Maximale Buzzer-Versuche erreicht' });
-    if (room.lockedOut.has(socket.id)) return cb?.({ error: 'Du bist gesperrt' });
+    // Jeder Pfad MUSS den Callback bedienen, sonst haengt der Buzzer-Button
+    // auf dem Handy (bei 20 Spielern betrifft das alle ausser dem Ersten).
+    if (!room || !room.players[socket.id]) return cb?.({ error: 'Nicht im Spiel' });
+    if (room.phase === 'buzzed') {
+      // Jemand war schneller — Reihenfolge trotzdem festhalten
+      const u = buzzUnitId(room, socket.id);
+      if (!room.lockedOut.has(u) && !room.buzzOrder.includes(socket.id)) {
+        room.buzzOrder.push(socket.id);
+        broadcastRoom(room);
+      }
+      return cb?.({ ok: true, tooLate: true });
+    }
+    if (room.phase !== 'question') return cb?.({ error: 'Gerade läuft keine Frage' });
+    if (room.buzzerClosed) return cb?.({ error: 'Buzzer ist gesperrt' });
+    const unit = buzzUnitId(room, socket.id);
+    // maxLockouts = 0 -> unbegrenzt
+    if (room.maxLockouts > 0 && room.lockedOut.size >= room.maxLockouts) {
+      return cb?.({ error: 'Maximale Buzzer-Versuche erreicht' });
+    }
+    if (room.lockedOut.has(unit)) {
+      return cb?.({ error: room.mode === 'teams' ? 'Dein Team ist gesperrt' : 'Du bist gesperrt' });
+    }
     if (!room.buzzOrder.includes(socket.id)) room.buzzOrder.push(socket.id);
     if (!room.buzzer) {
       room.buzzer = socket.id;
@@ -548,7 +775,7 @@ io.on('connection', (socket) => {
     if (!player || !q) return;
     const pts = q.isDailyDouble ? q.value * 2 : q.value;
     if (correct) {
-      player.score += pts;
+      addScore(room, buzzerId, pts);
       q.answered = true;
       room.phase = 'board';
       room.activeQuestion = null;
@@ -561,11 +788,12 @@ io.on('connection', (socket) => {
       clearRoomTimer(room);
       room.timer = null;
     } else {
-      player.score -= pts;
-      room.lockedOut.add(buzzerId);
+      addScore(room, buzzerId, -pts);
+      room.lockedOut.add(buzzUnitId(room, buzzerId));
       room.buzzer = null;
       room.phase = 'question';
-      room.buzzerClosed = room.lockedOut.size >= 3;
+      const limitHit = room.maxLockouts > 0 && room.lockedOut.size >= room.maxLockouts;
+      room.buzzerClosed = limitHit || room.lockedOut.size >= activeUnitCount(room);
     }
     broadcastRoom(room);
     cb?.({ ok: true });
@@ -588,6 +816,31 @@ io.on('connection', (socket) => {
     clearRoomTimer(room);
     room.timer = null;
     broadcastRoom(room);
+    cb?.({ ok: true });
+  });
+
+  // 3-2-1-Countdown vor Buzzer-Freigabe (Spannung + verhindert Vorab-Spam)
+  socket.on('gm:buzz_countdown', (_, cb) => {
+    const room = getRoomBySocket(socket.id);
+    if (!room || room.gamemasterId !== socket.id) return;
+    if (!['question', 'buzzed'].includes(room.phase)) return;
+    room.buzzerClosed = true;
+    broadcastRoom(room);
+    let n = 3;
+    io.to(room.code).emit('buzz:countdown', { n });
+    const iv = setInterval(() => {
+      n--;
+      if (n > 0) {
+        io.to(room.code).emit('buzz:countdown', { n });
+      } else {
+        clearInterval(iv);
+        if (rooms[room.code]) {
+          room.buzzerClosed = false;
+          io.to(room.code).emit('buzz:countdown', { n: 0 });
+          broadcastRoom(room);
+        }
+      }
+    }, 1000);
     cb?.({ ok: true });
   });
 
@@ -620,9 +873,9 @@ io.on('connection', (socket) => {
       room.players[socket.id].online = false;
       if (room.buzzer === socket.id) {
         room.buzzer = null;
-        room.lockedOut.add(socket.id);
+        room.lockedOut.add(buzzUnitId(room, socket.id));
         const activePlayers = Object.keys(room.players).filter(
-          id => room.players[id].online && !room.lockedOut.has(id)
+          id => room.players[id].online && !room.lockedOut.has(buzzUnitId(room, id))
         );
         room.phase = activePlayers.length > 0 ? 'question' : 'board';
         if (room.phase === 'board') {

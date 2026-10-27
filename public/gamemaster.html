@@ -517,6 +517,50 @@
       <div class="lobby-code-value" id="roomCodeDisplay">------</div>
       <div class="lobby-code-hint">Freunde öffnen diese Seite und geben den Code ein</div>
     </div>
+    <!-- QR-Code: bei vielen Spielern schneller als Code abtippen -->
+    <div id="qrBox" style="text-align:center;margin:4px 0 8px">
+      <canvas id="joinQr" width="150" height="150"
+        style="background:#fff;padding:8px;border-radius:12px;display:block;margin:0 auto"></canvas>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-top:6px" id="joinUrlLabel"></div>
+    </div>
+
+    <!-- Spielmodus -->
+    <div class="lobby-players-section">
+      <h3>Spielmodus</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" id="btnModeSolo" style="flex:1" onclick="setMode('solo')">👤 Einzelspieler</button>
+        <button class="btn btn-ghost" id="btnModeTeams" style="flex:1" onclick="setMode('teams')">👥 Teams</button>
+      </div>
+    </div>
+
+    <!-- Teamverwaltung (nur im Team-Modus) -->
+    <div class="lobby-players-section" id="gmTeamSection" style="display:none">
+      <h3 id="gmTeamCount">Teams (0)</h3>
+      <div id="gmTeamList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px">
+        <input id="gmNewTeam" type="text" placeholder="Teamname" maxlength="20"
+          style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;
+                 padding:10px 12px;color:var(--text);font-family:inherit;outline:none">
+        <button class="btn btn-ghost" onclick="gmCreateTeam()">+ Team</button>
+      </div>
+      <div style="font-size:.8rem;color:var(--text-muted);margin-top:8px">
+        Spieler können auch selbst Teams gründen und beitreten.
+      </div>
+    </div>
+
+    <!-- Buzzer-Versuche -->
+    <div class="lobby-players-section">
+      <h3>Buzzer-Versuche pro Frage</h3>
+      <div style="display:flex;align-items:center;gap:12px">
+        <input type="range" id="lockoutRange" min="0" max="20" value="3" style="flex:1"
+               oninput="onLockoutInput(this.value)" onchange="setMaxLockouts(this.value)">
+        <div id="lockoutLabel" style="min-width:110px;text-align:right;font-weight:700;color:var(--gold)">3 Versuche</div>
+      </div>
+      <div style="font-size:.8rem;color:var(--text-muted);margin-top:6px">
+        Nach so vielen Fehlversuchen ist die Frage beendet. 0 = unbegrenzt (empfohlen bei großen Gruppen).
+      </div>
+    </div>
+
     <div class="lobby-players-section">
       <h3 id="lobbyPlayerCount">Spieler (0)</h3>
       <div class="player-chips" id="lobbyPlayerList"></div>
@@ -572,6 +616,8 @@
         <div id="buzzerBox" class="buzzer-box" style="display:none">
           <div class="buzzer-box-label">Erster Buzzer</div>
           <div class="buzzer-name" id="gmBuzzerName"></div>
+          <div id="gmBuzzerPlayer" style="font-size:.9rem;color:var(--text-muted);margin-top:4px"></div>
+          <div id="gmBuzzOrder" style="font-size:.8rem;color:var(--text-dim);margin-top:6px"></div>
         </div>
         <div class="judge-row" id="judgeRow" style="display:none">
           <button class="btn btn-success btn-lg" onclick="judge(true)">✓ Richtig</button>
@@ -581,10 +627,11 @@
         <div class="wait-row" id="waitRow" style="display:none">
           <div class="pulse-dot"></div>
           <span>Warte auf Buzzer…</span>
-          <button class="btn btn-ghost" style="margin-left:auto" onclick="skipQuestion()">Frage überspringen</button>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="startBuzzCountdown()">3·2·1 Countdown</button>
+          <button class="btn btn-ghost" onclick="skipQuestion()">Frage überspringen</button>
         </div>
         <div class="wait-row" id="closedRow" style="display:none">
-          <span style="color:var(--danger,#e55)">&#9940; Buzzer gesperrt (3 Falschantworten)</span>
+          <span style="color:var(--danger,#e55)" id="closedLabel">&#9940; Buzzer gesperrt</span>
           <button class="btn btn-ghost" style="margin-left:auto" onclick="skipQuestion()">Frage überspringen</button>
         </div>
       </div>
@@ -637,12 +684,14 @@
 
 <div id="toast"></div>
 <script src="/socket.io/socket.io.js"></script>
+<script src="/qr.js"></script>
 <script>
 const socket = io();
 let state = null;
 let timerRunning = false;
 let selectedTimerDuration = 0; // 0 = off
 let editingScoreId = null;
+let editingIsTeam = false;
 
 // ── USER INFO ────────────────────────────────────────────────────────────────
 async function loadUserInfo() {
@@ -705,6 +754,7 @@ function createRoom(quizId) {
   socket.emit('gm:create_room', { quizId }, (res) => {
     if (res.error) return toast(res.error, 'err');
     document.getElementById('roomCodeDisplay').textContent = res.code;
+    renderJoinQr(res.code);
     document.getElementById('topbarBadge').style.display = 'flex';
     document.getElementById('topbarCode').textContent = res.code;
     document.getElementById('linkDisplay').href = `/display.html?code=${res.code}`;
@@ -773,10 +823,11 @@ socket.on('timer:timeout', () => {
 });
 
 // ── SCORE EDITING ─────────────────────────────────────────────────────────────
-function startScoreEdit(socketId, currentScore) {
+function startScoreEdit(entryId, currentScore, isTeam) {
   if (editingScoreId) commitScoreEdit();
-  editingScoreId = socketId;
-  const el = document.getElementById(`score-${socketId}`);
+  editingScoreId = entryId;
+  editingIsTeam = !!isTeam;
+  const el = document.getElementById(`score-${entryId}`);
   if (!el) return;
   const input = document.createElement('input');
   input.className = 'score-edit-input';
@@ -800,7 +851,8 @@ function commitScoreEdit() {
   const id = editingScoreId;
   editingScoreId = null;
   if (!isNaN(val)) {
-    socket.emit('gm:set_score', { socketId: id, score: val }, (res) => {
+    const payload = editingIsTeam ? { teamId: id, score: val } : { socketId: id, score: val };
+    socket.emit('gm:set_score', payload, (res) => {
       if (res?.error) toast(res.error, 'err');
     });
   } else {
@@ -831,12 +883,110 @@ function updateState(s) {
   }
 }
 
+// ── MODUS / TEAMS / LOCKOUT ──────────────────────────────────────────────────
+function setMode(mode) {
+  socket.emit('gm:set_mode', { mode }, (res) => {
+    if (res?.error) toast(res.error);
+  });
+}
+
+function onLockoutInput(v) {
+  const n = parseInt(v, 10);
+  document.getElementById('lockoutLabel').textContent =
+    n === 0 ? 'unbegrenzt' : n + (n === 1 ? ' Versuch' : ' Versuche');
+}
+
+function setMaxLockouts(v) {
+  socket.emit('gm:set_max_lockouts', { value: parseInt(v, 10) }, (res) => {
+    if (res?.error) toast(res.error);
+  });
+}
+
+function gmCreateTeam() {
+  const el = document.getElementById('gmNewTeam');
+  const name = el.value.trim();
+  if (!name) return toast('Bitte Teamnamen eingeben');
+  socket.emit('gm:create_team', { name }, (res) => {
+    if (res?.error) return toast(res.error);
+    el.value = '';
+  });
+}
+
+function gmDeleteTeam(teamId) {
+  socket.emit('gm:delete_team', { teamId }, (res) => {
+    if (res?.error) toast(res.error);
+  });
+}
+
+function startBuzzCountdown() {
+  socket.emit('gm:buzz_countdown', {}, (res) => { if (res?.error) toast(res.error); });
+}
+
 function renderLobby(s) {
   const players = s.players;
+  const isTeams = s.mode === 'teams';
+
+  document.getElementById('btnModeSolo').className  = 'btn ' + (isTeams ? 'btn-ghost' : 'btn-primary');
+  document.getElementById('btnModeTeams').className = 'btn ' + (isTeams ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('gmTeamSection').style.display = isTeams ? 'block' : 'none';
+
+  // Lockout-Regler nur bei Änderung von außen nachziehen
+  const rng = document.getElementById('lockoutRange');
+  if (document.activeElement !== rng && parseInt(rng.value, 10) !== s.maxLockouts) {
+    rng.value = s.maxLockouts;
+    onLockoutInput(s.maxLockouts);
+  }
+
+  if (isTeams) {
+    const teams = s.teams || [];
+    document.getElementById('gmTeamCount').textContent = `Teams (${teams.length})`;
+    document.getElementById('gmTeamList').innerHTML = teams.length === 0
+      ? '<div style="color:var(--text-muted);font-size:.85rem">Noch keine Teams.</div>'
+      : teams.map(t => `
+        <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);
+                    border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <span style="width:14px;height:14px;border-radius:50%;background:${t.color};flex:none"></span>
+          <span style="flex:1">
+            <strong>${esc(t.name)}</strong>
+            <div style="font-size:.78rem;color:var(--text-muted)">
+              ${t.members.map(m => esc(m.name)).join(', ') || 'noch leer'}
+            </div>
+          </span>
+          <span style="color:var(--text-muted);font-size:.85rem">${t.memberCount}</span>
+          <button onclick="gmDeleteTeam('${t.id}')" title="Team löschen"
+            style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:1.1rem">×</button>
+        </div>`).join('');
+  }
+
+  const homeless = isTeams ? players.filter(p => !p.teamId) : [];
   document.getElementById('lobbyPlayerCount').textContent = `Spieler (${players.length})`;
-  document.getElementById('lobbyPlayerList').innerHTML = players.map(p =>
-    `<div class="player-chip">${esc(p.name)}</div>`).join('');
-  document.getElementById('btnStartGame').disabled = players.length === 0;
+  document.getElementById('lobbyPlayerList').innerHTML = players.map(p => {
+    const team = isTeams && p.teamId ? (s.teams || []).find(t => t.id === p.teamId) : null;
+    const dot = team ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;
+                        background:${team.color};margin-right:6px"></span>` : '';
+    const warn = (isTeams && !p.teamId) ? ' style="opacity:.55"' : '';
+    return `<div class="player-chip"${warn}>${dot}${esc(p.name)}${(isTeams && !p.teamId) ? ' (kein Team)' : ''}</div>`;
+  }).join('');
+
+  const btn = document.getElementById('btnStartGame');
+  btn.disabled = players.length === 0 || (isTeams && (homeless.length > 0 || (s.teams || []).length === 0));
+  btn.textContent = homeless.length > 0
+    ? `${homeless.length} Spieler ohne Team`
+    : 'Spiel starten';
+}
+
+// ── QR-CODE ──────────────────────────────────────────────────────────────────
+function renderJoinQr(code) {
+  const url = location.origin + '/?code=' + encodeURIComponent(code);
+  document.getElementById('joinUrlLabel').textContent = url;
+  const cv = document.getElementById('joinQr');
+  if (window.QRCode && cv) {
+    try { QRCode.draw(cv, url); return; } catch (e) {}
+  }
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#000'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('QR nicht verfügbar', cv.width / 2, cv.height / 2);
 }
 
 function renderBoard(s) {
@@ -869,16 +1019,25 @@ function renderBoard(s) {
 }
 
 function renderScoreboard(s) {
-  const sorted = [...s.players].sort((a, b) => b.score - a.score);
-  document.getElementById('gmScoreboard').innerHTML = sorted.map((p, i) => `
+  const entries = [...(s.scoreboard || s.players)].sort((a, b) => b.score - a.score);
+  const isTeams = s.mode === 'teams';
+  document.getElementById('gmScoreboard').innerHTML = entries.map((p, i) => {
+    const off = p.online === false;
+    const dot = (isTeams && p.color)
+      ? `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${p.color};margin-right:6px"></span>`
+      : '';
+    const sub = (isTeams && p.members)
+      ? `<div style="font-size:.72rem;color:var(--text-dim)">${p.members.map(m => esc(m.name)).join(', ')}</div>`
+      : '';
+    return `
     <div class="score-row">
       <span class="score-rank">${i+1}</span>
-      <span class="score-name" style="${p.online===false?'opacity:.45;text-decoration:line-through':''}">
-        ${esc(p.name)}${p.online===false?' 📴':''}
+      <span class="score-name" style="${off?'opacity:.45':''}">
+        ${dot}${esc(p.name)}${off?' 📴':''}${sub}
       </span>
-      <span class="score-pts ${p.score<0?'neg':''}" id="score-${p.socketId}"
-            onclick="startScoreEdit('${p.socketId}', ${p.score})">$${p.score}</span>
-    </div>`).join('');
+      <span class="score-pts ${p.score<0?'neg':''}" id="score-${p.id}"
+            onclick="startScoreEdit('${p.id}', ${p.score}, ${isTeams})">$${p.score}</span>
+    </div>`; }).join('');
 }
 
 function renderProgress(s) {
@@ -990,10 +1149,22 @@ function renderQuestion(s) {
   if (s.phase === 'buzzed' && s.buzzer) {
     buzzerBox.style.display = 'block';
     document.getElementById('gmBuzzerName').textContent = s.buzzer;
+    // Im Team-Modus sieht nur der GM, wer konkret gedrückt hat
+    const pl = document.getElementById('gmBuzzerPlayer');
+    pl.textContent = (s.mode === 'teams' && s.buzzerPlayerName)
+      ? 'gedrückt von: ' + s.buzzerPlayerName : '';
+    const ord = document.getElementById('gmBuzzOrder');
+    ord.textContent = (s.buzzOrder && s.buzzOrder.length > 1)
+      ? 'Reihenfolge: ' + s.buzzOrder.join(' → ') : '';
     judgeRow.style.display = 'flex';
   } else if (!s.questionRevealed) {
     revealRow.style.display = 'flex';
   } else if (s.buzzerClosed) {
+    const lbl = document.getElementById('closedLabel');
+    if (lbl) {
+      lbl.innerHTML = '&#9940; Buzzer gesperrt' +
+        (s.maxLockouts > 0 ? ` (${s.lockedOutCount}/${s.maxLockouts} Fehlversuche)` : '');
+    }
     closedRow.style.display = 'flex';
   } else {
     waitRow.style.display = 'flex';
@@ -1001,7 +1172,7 @@ function renderQuestion(s) {
 }
 
 function renderEnd(s) {
-  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const sorted = [...(s.scoreboard || s.players)].sort((a, b) => b.score - a.score);
   const medals = ['🥇','🥈','🥉'];
   const cls = ['p1','p2','p3'];
   document.getElementById('endPodium').innerHTML = sorted.slice(0,3).map((p,i) => `

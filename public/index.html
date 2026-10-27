@@ -281,6 +281,83 @@
   }
 
   /* ── BUZZER ── */
+  /* ── BUZZER-ONLY (Handy) ── */
+  .buzzer-only .q-top { display: none !important; }
+  .buzzer-only .buzzer-section { flex: 1; justify-content: center; }
+  .buzzer-only .buzzer-btn {
+    width: min(78vw, 300px);
+    height: min(78vw, 300px);
+    font-size: clamp(1.8rem, 9vw, 3rem);
+  }
+  .bo-header {
+    display: none;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 2px 0;
+  }
+  .buzzer-only .bo-header { display: flex; }
+  .bo-team { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1rem; }
+  .bo-dot { width: 13px; height: 13px; border-radius: 50%; background: var(--gold); flex: none; }
+  .bo-score { font-family: 'Oswald', sans-serif; font-size: 1.5rem; color: var(--gold); font-weight: 700; }
+  .bo-value {
+    font-family: 'Oswald', sans-serif;
+    font-size: 2.6rem;
+    color: var(--gold);
+    text-align: center;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+  .bo-sub { text-align: center; color: var(--text-muted); font-size: .85rem; margin-bottom: 10px; }
+  .bo-timer {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.6rem;
+    color: var(--text);
+    text-align: center;
+  }
+  .bo-timer.urgent { color: var(--red); animation: pulseScale .5s infinite; }
+  @keyframes pulseScale { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+
+  /* Buzz-Platzierung */
+  .buzz-rank {
+    font-size: 1.1rem; font-weight: 800; color: var(--gold);
+    text-align: center; min-height: 24px;
+  }
+
+  /* ── COUNTDOWN-OVERLAY ── */
+  #countdownOverlay {
+    position: fixed; inset: 0; z-index: 900;
+    background: rgba(15,14,23,.93);
+    display: none; align-items: center; justify-content: center;
+  }
+  #countdownOverlay.show { display: flex; }
+  #countdownNum {
+    font-family: 'Oswald', sans-serif;
+    font-size: clamp(6rem, 35vw, 14rem);
+    color: var(--gold);
+    text-shadow: 0 0 80px var(--gold-glow);
+    animation: cdPop .45s ease-out;
+  }
+  @keyframes cdPop { from{transform:scale(2.2);opacity:0} to{transform:scale(1);opacity:1} }
+
+  /* ── TEAM-AUSWAHL ── */
+  .team-list { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+  .team-card {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface2); border: 2px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 16px;
+    cursor: pointer; transition: all .15s; text-align: left; width: 100%;
+    font-family: inherit; color: var(--text); font-size: 1rem;
+  }
+  .team-card:hover { border-color: var(--text-dim); }
+  .team-card.mine { border-color: var(--gold); background: rgba(245,200,66,.10); }
+  .team-swatch { width: 18px; height: 18px; border-radius: 50%; flex: none; }
+  .team-card-name { font-weight: 700; flex: 1; }
+  .team-card-count { color: var(--text-muted); font-size: .85rem; }
+  .team-members { font-size: .8rem; color: var(--text-muted); margin-top: 2px; font-weight: 400; }
+  .team-divider { text-align: center; color: var(--text-dim); font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; margin: 4px 0; }
+
   .buzzer-section { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
   .buzzer-btn {
     width: min(260px, 72vw);
@@ -475,6 +552,17 @@
       <span>Warte auf Spielstart...</span>
     </div>
     <div class="player-grid" id="lobbyPlayers"></div>
+
+    <!-- Team-Auswahl (nur im Team-Modus) -->
+    <div id="teamPicker" style="display:none;width:100%;max-width:420px">
+      <div class="team-divider">Wähle dein Team</div>
+      <div class="team-list" id="teamList"></div>
+      <div class="team-divider">oder</div>
+      <div class="input-group">
+        <input id="newTeamInput" type="text" placeholder="Neues Team gründen…" maxlength="20" autocomplete="off">
+        <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="createTeam()">+ Team erstellen</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -514,8 +602,23 @@
       <div class="q-text" id="playerQText"></div>
     </div>
     <div class="buzzer-section">
+      <div class="bo-header">
+        <div class="bo-team"><span class="bo-dot" id="boDot"></span><span id="boTeamName">—</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="bo-score" id="boScore">$0</div>
+          <button onclick="toggleView()" title="Ansicht wechseln"
+            style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);
+                   border-radius:8px;padding:6px 9px;cursor:pointer;font-size:.95rem">⛶</button>
+        </div>
+      </div>
+      <div style="width:100%">
+        <div class="bo-value" id="boValue" style="display:none"></div>
+        <div class="bo-sub" id="boSub" style="display:none"></div>
+        <div class="bo-timer" id="boTimer" style="display:none"></div>
+      </div>
       <button class="buzzer-btn" id="buzzerBtn" onclick="buzz()">BUZZ!</button>
       <div class="buzzer-status" id="buzzerStatus">Drücke BUZZ wenn du die Antwort weißt!</div>
+      <div class="buzz-rank" id="buzzRank"></div>
       <div class="buzzed-announce" id="buzzedAnnounce"></div>
     </div>
   </div>
@@ -532,6 +635,7 @@
   </div>
 </div>
 
+<div id="countdownOverlay"><div id="countdownNum">3</div></div>
 <div id="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -541,6 +645,75 @@ let myId = null;
 let myName = '';
 let roomCode = '';
 let myBuzzedCell = null; // { categoryIdx, questionIdx }
+let myTeamId = null;
+let lastState = null;
+let buzzerOnly = localStorage.getItem('jeopardyBuzzerOnly');
+// Standard: auf Handys nur der Buzzer, am Desktop die volle Ansicht
+buzzerOnly = buzzerOnly === null ? isMobile() : buzzerOnly === '1';
+
+function isMobile() {
+  return window.matchMedia('(max-width: 820px)').matches
+      || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+// ── HAPTIK ───────────────────────────────────────────────────────────────────
+function vibrate(pattern) {
+  try { navigator.vibrate && navigator.vibrate(pattern); } catch (e) {}
+}
+
+// ── SOUND ────────────────────────────────────────────────────────────────────
+// Eigene Töne per Web Audio (kein Copyright-Problem). Eigene Dateien können
+// unter /sounds/<name>.mp3 abgelegt werden und haben dann Vorrang.
+const Sound = {
+  ctx: null,
+  enabled: localStorage.getItem('jeopardySound') !== '0',
+  unlock() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) this.ctx = new AC();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  tone(freq, dur, type = 'sine', vol = .22, delay = 0) {
+    if (!this.enabled || !this.ctx) return;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + .015);
+    g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(t0); o.stop(t0 + dur + .05);
+  },
+  file(name) {
+    if (!this.enabled) return false;
+    const a = new Audio('/sounds/' + name + '.mp3');
+    a.volume = .6;
+    const pr = a.play();
+    if (pr) pr.catch(() => {});
+    return true;
+  },
+  buzz()    { this.unlock(); this.tone(170, .28, 'square', .3); vibrate([70, 40, 70]); },
+  correct() { this.unlock(); [523,659,784,1047].forEach((f,i) => this.tone(f, .3, 'triangle', .22, i*.1)); },
+  wrong()   { this.unlock(); this.tone(200, .5, 'sawtooth', .22); this.tone(150, .55, 'sawtooth', .2, .12); },
+  tick()    { this.unlock(); this.tone(880, .1, 'sine', .18); },
+  go()      { this.unlock(); this.tone(1320, .3, 'triangle', .25); }
+};
+
+// ── WAKE LOCK: Handy soll während des Spiels nicht einschlafen ──────────────
+let wakeLock = null;
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && myId) keepAwake();
+});
 
 
 function showPage(id) {
@@ -560,6 +733,20 @@ function esc(s) {
 }
 
 // ── JOIN ─────────────────────────────────────────────────────────────────────
+// Per QR-Code geöffnet: Code direkt eintragen, Name ggf. aus letztem Spiel
+(function prefill() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  if (code) {
+    document.getElementById('codeInput').value = code.toUpperCase();
+  }
+  try {
+    const last = localStorage.getItem('jeopardyName');
+    if (last) document.getElementById('nameInput').value = last;
+  } catch (e) {}
+  if (code) setTimeout(() => document.getElementById('nameInput').focus(), 100);
+})();
+
 document.getElementById('codeInput').addEventListener('input', function() {
   this.value = this.value.toUpperCase();
 });
@@ -574,47 +761,154 @@ function joinGame() {
   if (!code) return errEl.textContent = 'Bitte Code eingeben.';
   if (!name) return errEl.textContent = 'Bitte Namen eingeben.';
   document.getElementById('joinBtn').disabled = true;
+  // Tippen auf "Beitreten" ist die Nutzergeste, die Audio auf dem Handy freischaltet
+  Sound.unlock();
   socket.emit('player:join', { code, name }, (res) => {
     document.getElementById('joinBtn').disabled = false;
     if (res.error) return errEl.textContent = res.error;
     myId = res.playerId;
     myName = name;
     roomCode = code;
+    try { localStorage.setItem('jeopardyName', name); } catch (e) {}
+    keepAwake();
     if (res.rejoined) toast('Willkommen zurück! Deine Punkte wurden wiederhergestellt.');
     updateState(res.state);
   });
 }
 
-function buzz() {
-  socket.emit('player:buzz', {}, (res) => {
-    if (res?.error) toast(res.error);
+function toggleView() {
+  buzzerOnly = !buzzerOnly;
+  try { localStorage.setItem('jeopardyBuzzerOnly', buzzerOnly ? '1' : '0'); } catch (e) {}
+  toast(buzzerOnly ? 'Nur Buzzer' : 'Volle Ansicht');
+  if (lastState) updateState(lastState);
+}
+
+// ── TEAMS ────────────────────────────────────────────────────────────────────
+function createTeam() {
+  const el = document.getElementById('newTeamInput');
+  const name = el.value.trim();
+  if (!name) return toast('Bitte Teamnamen eingeben');
+  socket.emit('player:create_team', { name }, (res) => {
+    if (res?.error) return toast(res.error);
+    el.value = '';
+    myTeamId = res.teamId;
+    vibrate(40);
   });
 }
 
+function joinTeam(teamId) {
+  socket.emit('player:join_team', { teamId }, (res) => {
+    if (res?.error) return toast(res.error);
+    myTeamId = res.teamId;
+    vibrate(40);
+  });
+}
+
+function buzz() {
+  const btn = document.getElementById('buzzerBtn');
+  if (btn.disabled) return;
+  Sound.buzz();
+  socket.emit('player:buzz', {}, (res) => {
+    if (res?.error) { toast(res.error); vibrate(200); }
+  });
+}
+
+// Leertaste als Buzzer (Desktop)
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && lastState && ['question','buzzed'].includes(lastState.phase)
+      && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault(); buzz();
+  }
+});
+
+// ── COUNTDOWN ────────────────────────────────────────────────────────────────
+socket.on('buzz:countdown', ({ n }) => {
+  const ov = document.getElementById('countdownOverlay');
+  const el = document.getElementById('countdownNum');
+  if (n > 0) {
+    ov.classList.add('show');
+    el.textContent = n;
+    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    Sound.tick(); vibrate(40);
+  } else {
+    el.textContent = 'GO!';
+    Sound.go(); vibrate([60,40,120]);
+    setTimeout(() => ov.classList.remove('show'), 450);
+  }
+});
+
 socket.on('room:update', updateState);
 socket.on('game:closed', (d) => { toast(d.reason || 'Spiel beendet'); setTimeout(() => location.reload(), 3000); });
-socket.on('timer:timeout', () => { toast('Zeit abgelaufen!', 2500); });
+socket.on('timer:timeout', () => { toast('Zeit abgelaufen!', 2500); Sound.wrong(); vibrate([100,60,100]); });
 
+
+// Mein Eintrag im Scoreboard (Team oder Spieler)
+function myEntry(s) {
+  if (!s.scoreboard) return null;
+  if (s.mode === 'teams') {
+    const me = (s.players || []).find(p => p.socketId === myId || p.name === myName);
+    const tid = me ? me.teamId : myTeamId;
+    return s.scoreboard.find(e => e.id === tid) || null;
+  }
+  return s.scoreboard.find(e => e.name === myName) || null;
+}
+
+// Gehört dieser Buzz zu mir/meinem Team?
+function buzzIsMine(s) {
+  const mine = myEntry(s);
+  return !!(s.buzzer && mine && s.buzzer === mine.name);
+}
 
 function updateState(s) {
+  lastState = s;
+  const me = (s.players || []).find(p => p.socketId === myId || p.name === myName);
+  if (me && me.teamId) myTeamId = me.teamId;
+
   if (s.phase === 'lobby') {
     document.getElementById('lobbyCode').textContent = s.code || roomCode;
     renderLobbyPlayers(s);
+    renderTeamPicker(s);
     showPage('pageLobby');
   } else if (s.phase === 'end') {
     renderEnd(s);
     showPage('pageEnd');
   } else if (s.phase === 'board') {
-    renderBoard(s);
-    renderMyScore(s);
-    renderScoresMini(s);
-    showPage('pageBoard');
+    if (buzzerOnly) {
+      // Im Buzzer-Only-Modus bleibt die Buzzer-Seite stehen (Warten auf Frage)
+      renderQuestion(s);
+      showPage('pageQuestion');
+    } else {
+      renderBoard(s);
+      renderMyScore(s);
+      renderScoresMini(s);
+      showPage('pageBoard');
+    }
   } else if (['question', 'buzzed'].includes(s.phase)) {
-    renderBoard(s);
-    renderMyScore(s);
+    if (!buzzerOnly) { renderBoard(s); renderMyScore(s); }
     renderQuestion(s);
     showPage('pageQuestion');
   }
+}
+
+// ── TEAM-PICKER (Lobby) ──────────────────────────────────────────────────────
+function renderTeamPicker(s) {
+  const wrap = document.getElementById('teamPicker');
+  if (s.mode !== 'teams') { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const list = document.getElementById('teamList');
+  if (!s.teams || s.teams.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:.9rem">Noch keine Teams — gründe das erste!</div>';
+    return;
+  }
+  list.innerHTML = s.teams.map(t => `
+    <button class="team-card ${t.id === myTeamId ? 'mine' : ''}" onclick="joinTeam('${t.id}')">
+      <span class="team-swatch" style="background:${t.color}"></span>
+      <span style="flex:1">
+        <span class="team-card-name">${esc(t.name)}${t.id === myTeamId ? ' ✓' : ''}</span>
+        <span class="team-members">${t.members.map(m => esc(m.name)).join(', ') || 'noch leer'}</span>
+      </span>
+      <span class="team-card-count">${t.memberCount}</span>
+    </button>`).join('');
 }
 
 function renderLobbyPlayers(s) {
@@ -645,23 +939,68 @@ function renderBoard(s) {
 }
 
 function renderMyScore(s) {
-  const me = s.players.find(p => p.socketId === myId);
+  const me = myEntry(s);
   if (!me) return;
   const el = document.getElementById('myScore');
   el.textContent = '$' + me.score;
   el.className = 'my-score-value' + (me.score < 0 ? ' negative' : '');
+  const lbl = document.querySelector('.my-score-label');
+  if (lbl) lbl.textContent = s.mode === 'teams' ? 'Team ' + me.name : 'Deine Punkte';
 }
 
 function renderScoresMini(s) {
-  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const sorted = [...(s.scoreboard || s.players)].sort((a, b) => b.score - a.score);
   document.getElementById('scoresMini').innerHTML = sorted.map(p =>
     `<div class="score-chip">${esc(p.name)} <strong>$${p.score}</strong></div>`
   ).join('');
 }
 
 function renderQuestion(s) {
+  const page = document.querySelector('#pageQuestion .question-page');
+  page.classList.toggle('buzzer-only', buzzerOnly);
+
+  // Kopfzeile im Buzzer-Only-Modus: Team/Name + Punkte
+  const mine = myEntry(s);
+  if (buzzerOnly) {
+    document.getElementById('boTeamName').textContent = mine ? mine.name : myName;
+    document.getElementById('boScore').textContent = '$' + (mine ? mine.score : 0);
+    document.getElementById('boDot').style.background =
+      (mine && mine.color) ? mine.color : 'var(--gold)';
+  }
+
   const q = s.activeQuestion;
-  if (!q) return;
+
+  // Zwischen den Fragen: Buzzer-Only zeigt einen Wartezustand statt nichts
+  if (!q) {
+    if (buzzerOnly) {
+      ['boValue','boSub','boTimer'].forEach(id => document.getElementById(id).style.display = 'none');
+      const btn = document.getElementById('buzzerBtn');
+      btn.disabled = true;
+      btn.className = 'buzzer-btn';
+      document.getElementById('buzzerStatus').textContent = 'Warte auf die nächste Frage…';
+      document.getElementById('buzzRank').textContent = '';
+      document.getElementById('buzzedAnnounce').textContent = '';
+    }
+    return;
+  }
+
+  if (buzzerOnly) {
+    const bv = document.getElementById('boValue');
+    const bs = document.getElementById('boSub');
+    bv.style.display = 'block';
+    bv.textContent = (q.isDailyDouble ? '★ ' : '') + '$' + q.value;
+    bs.style.display = 'block';
+    bs.textContent = q.isDailyDouble ? 'Daily Double — doppelte Punkte!' : 'Frage läuft';
+    const bt = document.getElementById('boTimer');
+    if (s.timer) {
+      bt.style.display = 'block';
+      bt.textContent = '⏱ ' + s.timer.remaining + 's';
+      bt.className = 'bo-timer' + (s.timer.remaining <= 5 && s.timer.remaining > 0 ? ' urgent' : '');
+    } else {
+      bt.style.display = 'none';
+    }
+  }
+
   document.getElementById('qValueBadge').textContent = q.isDailyDouble ? '★ $' + q.value : '$' + q.value;
   document.getElementById('playerDdBadge').style.display = q.isDailyDouble ? 'block' : 'none';
   document.getElementById('playerQText').textContent = s.questionRevealed ? (q.question || '') : '';
@@ -700,45 +1039,56 @@ function renderQuestion(s) {
   const status = document.getElementById('buzzerStatus');
   const announce = document.getElementById('buzzedAnnounce');
 
-  // Buzzer only usable after question is revealed and not closed
+  const rank = document.getElementById('buzzRank');
+  const isTeams = s.mode === 'teams';
+
   if (s.phase === 'question') {
     btn.disabled = !s.questionRevealed || s.buzzerClosed;
     btn.className = 'buzzer-btn';
     if (!s.questionRevealed) {
       status.textContent = 'Warte auf den Gamemaster…';
     } else if (s.buzzerClosed) {
-      status.textContent = 'Buzzer gesperrt — niemand hat die Frage gewusst.';
+      status.textContent = isTeams && mine && s.buzzOrder.includes(mine.name)
+        ? 'Dein Team ist für diese Frage gesperrt.'
+        : 'Buzzer gesperrt.';
     } else {
       status.textContent = 'Drücke BUZZ wenn du die Antwort weißt!';
     }
     announce.textContent = '';
     announce.className = 'buzzed-announce';
+    rank.textContent = '';
   } else if (s.phase === 'buzzed') {
-    const wasAlreadyBuzzed = btn.disabled;
+    const wasEnabled = !btn.disabled;
     btn.disabled = true;
-    const isMe = s.buzzer === myName;
+    const isMe = buzzIsMine(s);
     btn.className = 'buzzer-btn' + (isMe ? ' buzzed-me' : '');
-    if (!wasAlreadyBuzzed) {
-      // no sound
-      if (isMe && s.activeQuestion) {
-        myBuzzedCell = { categoryIdx: s.activeQuestion.categoryIdx, questionIdx: s.activeQuestion.questionIdx };
-      }
+    if (wasEnabled && isMe && s.activeQuestion) {
+      myBuzzedCell = { categoryIdx: s.activeQuestion.categoryIdx, questionIdx: s.activeQuestion.questionIdx };
     }
     if (isMe) {
-      status.textContent = 'Du hast gebuzzert — antworte laut!';
-      announce.textContent = '🎯 Du bist dran!';
+      status.textContent = isTeams
+        ? 'Dein Team ist dran — antwortet laut!'
+        : 'Du hast gebuzzert — antworte laut!';
+      announce.textContent = '🎯 ' + (isTeams ? 'Ihr seid dran!' : 'Du bist dran!');
       announce.className = 'buzzed-announce is-me';
     } else {
       status.textContent = '';
       announce.textContent = (s.buzzer || '???') + ' hat gebuzzert!';
       announce.className = 'buzzed-announce';
     }
+    // Platzierung anzeigen — bei großen Gruppen überraschend motivierend
+    if (mine && s.buzzOrder) {
+      const pos = s.buzzOrder.indexOf(mine.name);
+      rank.textContent = pos >= 0 ? (pos === 0 ? '⚡ Du warst zuerst!' : `Du warst #${pos + 1}`) : '';
+    }
   }
 }
 
 
 function renderEnd(s) {
-  const sorted = [...s.players].sort((a, b) => b.score - a.score);
+  const mine = myEntry(s);
+  const sorted = [...(s.scoreboard || s.players)].sort((a, b) => b.score - a.score);
+  if (mine && sorted[0] && sorted[0].name === mine.name) { Sound.correct(); vibrate([120,60,120,60,220]); }
   const medals = ['🥇','🥈','🥉'];
   const pClasses = ['p1','p2','p3'];
 
@@ -752,7 +1102,7 @@ function renderEnd(s) {
   document.getElementById('finalScores').innerHTML = sorted.map((p,i) => `
     <div class="final-row">
       <span class="final-rank">${medals[i]||i+1+'.'}</span>
-      <span class="final-name">${esc(p.name)}${p.name===myName?' <span style="color:var(--text-muted);font-weight:400">(du)</span>':''}</span>
+      <span class="final-name">${esc(p.name)}${(mine&&p.name===mine.name)?' <span style="color:var(--text-muted);font-weight:400">(du)</span>':''}</span>
       <span class="final-score ${p.score<0?'neg':''}">$${p.score}</span>
     </div>`).join('');
 }
